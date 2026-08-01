@@ -4,9 +4,9 @@
   
   <p>
     <a href="https://github.com/atharv01h/WAKit/actions"><img src="https://img.shields.io/github/actions/workflow/status/atharv01h/WAKit/test.yml?branch=main&style=flat-square&logo=github" alt="Build Status"></a>
-    <a href="https://www.npmjs.com/package/wakit"><img src="https://img.shields.io/npm/v/wakit?style=flat-square&color=blue" alt="NPM Version"></a>
-    <a href="https://www.npmjs.com/package/wakit"><img src="https://img.shields.io/npm/dt/wakit?style=flat-square&color=green" alt="NPM Downloads"></a>
-    <a href="https://github.com/atharv01h/WAKit/blob/main/LICENSE"><img src="https://img.shields.io/npm/l/wakit?style=flat-square&color=orange" alt="License"></a>
+    <a href="https://www.npmjs.com/package/@atharvh01/wakit"><img src="https://img.shields.io/npm/v/@atharvh01/wakit?style=flat-square&color=blue" alt="NPM Version"></a>
+    <a href="https://www.npmjs.com/package/@atharvh01/wakit"><img src="https://img.shields.io/npm/dt/@atharvh01/wakit?style=flat-square&color=green" alt="NPM Downloads"></a>
+    <a href="https://github.com/atharv01h/WAKit/blob/main/LICENSE"><img src="https://img.shields.io/npm/l/@atharvh01/wakit?style=flat-square&color=orange" alt="License"></a>
   </p>
 </div>
 
@@ -46,11 +46,11 @@ WAKit was born as an architectural evolution of the legendary [Baileys](https://
 WAKit requires **Node.js ≥ 20.0.0** and uses **Yarn 4** (via Corepack).
 
 ```bash
-npm install wakit
+npm install @atharvh01/wakit
 # or
-yarn add wakit
+yarn add @atharvh01/wakit
 # or
-pnpm add wakit
+pnpm add @atharvh01/wakit
 ```
 
 ---
@@ -60,7 +60,7 @@ pnpm add wakit
 Setting up a robust WhatsApp client with WAKit takes only a few lines of code.
 
 ```typescript
-import { createClient, JsonFileStore, incomingLoggingMiddleware } from 'wakit'
+import { createClient, JsonFileStore, incomingLoggingMiddleware } from '@atharvh01/wakit'
 
 async function main() {
   // 1. Initialize an atomic JSON store for session keys
@@ -116,7 +116,7 @@ main().catch(console.error)
 Modify or filter messages before they reach your business logic (incoming) or before they are sent to the WhatsApp servers (outgoing).
 
 ```typescript
-import { filterJidMiddleware, rateLimitMiddleware } from 'wakit/Middleware/builtins'
+import { filterJidMiddleware, rateLimitMiddleware } from '@atharvh01/wakit/Middleware/builtins'
 
 // Drop messages from certain JIDs
 client.useIncoming(filterJidMiddleware(jid => jid.includes('broadcast')))
@@ -129,7 +129,7 @@ client.useIncoming(rateLimitMiddleware({ maxPerWindow: 60, windowMs: 60000 }))
 Encapsulate complex behavior into reusable plugins.
 
 ```typescript
-import { AutoReadPlugin } from 'wakit/Plugins/AutoRead'
+import { AutoReadPlugin } from '@atharvh01/wakit/Plugins/AutoRead'
 
 // Automatically send read receipts for incoming messages
 client.registerPlugin(new AutoReadPlugin())
