@@ -24,7 +24,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 20.x
+          node-version: 24.x
           registry-url: 'https://registry.npmjs.org'
 
       - name: Upgrade npm to a version that supports Trusted Publishers
@@ -47,14 +47,8 @@ jobs:
       - name: Install Dependencies
         run: yarn install --immutable
 
-      - name: Publish in NPM (as `wakit`)
+      - name: Publish to NPM
         run: npm publish --access public --provenance --tag latest
-
-      - name: Publish in NPM (wakit scope)
-        run: |
-          npx json -I -f package.json -e "this.name='@wakit/wakit'"
-          npm publish --access public --provenance --tag latest
-          npx json -I -f package.json -e "this.name='wakit'"
 
       - name: Generate Changelog
         id: generate_changelog
