@@ -1,0 +1,7 @@
+export { PluginRegistry } from './PluginRegistry'
+export { definePlugin } from './types'
+export type { WAKitPlugin, PluginPermission } from './types'
+export { LoggerPlugin } from './builtins/LoggerPlugin'
+export type { LoggerPluginOptions } from './builtins/LoggerPlugin'
+export { WebhookPlugin } from './builtins/WebhookPlugin'
+export type { WebhookPluginOptions } from './builtins/WebhookPlugin'
