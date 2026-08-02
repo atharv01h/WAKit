@@ -12,6 +12,8 @@ export type PluginPermission =
 	| 'media:write'
 	| 'presence:write'
 	| 'socket:raw'
+	| 'rest:register'
+	| 'scheduler:register'
 
 /**
  * The contract every WAKit plugin must satisfy.
@@ -23,6 +25,7 @@ export type PluginPermission =
  * export default definePlugin({
  *   name: 'my-analytics',
  *   version: '1.0.0',
+ *   author: 'Your Name',
  *   permissions: ['messages:read'],
  *   async install(client) {
  *     client.on('messages.upsert', ({ messages }) => {
@@ -39,6 +42,8 @@ export interface WAKitPlugin {
 	readonly version: string
 	/** Optional human-readable description */
 	readonly description?: string
+	/** Plugin author name or email */
+	readonly author?: string
 	/**
 	 * Names of other plugins this plugin depends on.
 	 * WAKit ensures dependencies are installed before this plugin.
@@ -49,17 +54,37 @@ export interface WAKitPlugin {
 	 * and future sandboxing. Not enforced at runtime in v1.
 	 */
 	readonly permissions?: readonly PluginPermission[]
+
+	/**
+	 * Called before `install`, after dependency resolution.
+	 * Use for any setup that must happen before other plugins see this one.
+	 */
+	initialize?(client: import('../client/WAKitClient').WAKitClient): Promise<void>
+
 	/**
 	 * Called when the plugin is installed on a WAKitClient.
 	 * This is where you attach event listeners, register middleware, etc.
 	 * Must not throw — if it does, the error is re-thrown and installation fails.
 	 */
 	install(client: import('../client/WAKitClient').WAKitClient): Promise<void>
+
+	/**
+	 * Called after ALL plugins have been installed.
+	 * Use for cross-plugin coordination that requires other plugins to be ready.
+	 */
+	ready?(client: import('../client/WAKitClient').WAKitClient): Promise<void>
+
 	/**
 	 * Called when the plugin is uninstalled (e.g., before client.destroy()).
 	 * Use to clean up timers, listeners, and external connections.
 	 */
 	uninstall?(client: import('../client/WAKitClient').WAKitClient): Promise<void>
+
+	/**
+	 * Alias for `uninstall`. Called during `destroy()` phase.
+	 * If both `destroy` and `uninstall` are defined, only `uninstall` runs.
+	 */
+	destroy?(client: import('../client/WAKitClient').WAKitClient): Promise<void>
 }
 
 /**
@@ -70,6 +95,7 @@ export interface WAKitPlugin {
  * export default definePlugin({
  *   name: 'my-plugin',
  *   version: '1.0.0',
+ *   author: 'Atharv Hatwar',
  *   async install(client) { ... }
  * })
  * ```

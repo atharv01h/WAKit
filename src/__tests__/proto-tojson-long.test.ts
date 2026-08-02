@@ -23,7 +23,7 @@ describe('proto serialization', () => {
 			throw new Error('imageMessage missing in test setup')
 		}
 
-		;(imageMessage as unknown as { fileLength: unknown }).fileLength = '1234567890123456789'
+		;(imageMessage as unknown as { fileLength: unknown }).fileLength = Long.fromString('1234567890123456789')
 
 		expect(() => JSON.stringify(message)).not.toThrow()
 		const json = message.toJSON()

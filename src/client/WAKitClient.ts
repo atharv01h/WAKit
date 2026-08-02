@@ -9,6 +9,12 @@ import { createPipeline } from '../Middleware/createPipeline'
 import type { IncomingMessageContext, OutgoingMessageContext } from '../Middleware/types'
 import makeWASocket from '../Socket/index'
 import type { WAKitStore } from '../Storage/types'
+import { WAKitRestServer } from '../REST/WAKitRestServer'
+import type { RestApiConfig } from '../REST/types'
+import { WAKitScheduler } from '../Scheduler/WAKitScheduler'
+import type { SchedulerConfig } from '../Scheduler/types'
+import { WAKitRecorder } from '../Recorder/WAKitRecorder'
+import type { RecorderConfig } from '../Recorder/types'
 
 type WASocket = ReturnType<typeof makeWASocket>
 
@@ -23,6 +29,12 @@ export interface WAKitClientConfig extends Omit<Partial<UserFacingSocketConfig>,
 	maxReconnectAttempts?: number
 	/** Base delay in ms between reconnect attempts, uses exponential backoff (default: 1000) */
 	reconnectBaseDelayMs?: number
+	/** REST API configuration. Pass to auto-initialize client.api */
+	rest?: RestApiConfig
+	/** Scheduler configuration */
+	scheduler?: SchedulerConfig
+	/** Recorder configuration */
+	recorder?: RecorderConfig
 }
 
 /**
@@ -30,9 +42,12 @@ export interface WAKitClientConfig extends Omit<Partial<UserFacingSocketConfig>,
  *
  * It wraps makeWASocket with:
  * - Automatic reconnection with exponential backoff
- * - Fluent plugin registration
+ * - Fluent plugin registration (with full lifecycle: initialize → install → ready)
  * - Composable middleware pipelines for incoming/outgoing messages
- * - Typed event subscription
+ * - Typed event subscription (survives reconnects)
+ * - REST API server (client.api)
+ * - Job scheduler (client.scheduler)
+ * - Event recorder & replay (client.recorder)
  *
  * All underlying WAKit socket APIs remain accessible via `.socket`.
  *
@@ -41,6 +56,17 @@ export interface WAKitClientConfig extends Omit<Partial<UserFacingSocketConfig>,
  * const client = await createClient({ auth: './session' })
  * client.on('messages.upsert', ({ messages }) => { ... })
  * await client.sendMessage(jid, { text: 'hello' })
+ *
+ * // REST API
+ * await client.api.enable({ port: 3000 })
+ *
+ * // Scheduler
+ * client.scheduler.daily('09:00', async () => {
+ *   await client.sendMessage(jid, { text: 'Good morning!' })
+ * })
+ *
+ * // Recorder
+ * client.recorder.start()
  * ```
  */
 export class WAKitClient {
@@ -64,6 +90,17 @@ export class WAKitClient {
 		Array<(arg: WAKitEventMap[keyof WAKitEventMap]) => void>
 	>()
 
+	// ─── Sub-systems ─────────────────────────────────────────────────────────
+
+	/** The REST API server subsystem. Call .start() to begin listening. */
+	readonly api: WAKitRestServer
+
+	/** The job scheduler subsystem. Jobs registered here survive reconnects. */
+	readonly scheduler: WAKitScheduler
+
+	/** The event recorder and replay subsystem. */
+	readonly recorder: WAKitRecorder
+
 	constructor(config: WAKitClientConfig, socketConfig: UserFacingSocketConfig) {
 		this._socketConfig = socketConfig
 		this._config = {
@@ -71,6 +108,11 @@ export class WAKitClient {
 			maxReconnectAttempts: config.maxReconnectAttempts ?? Infinity,
 			reconnectBaseDelayMs: config.reconnectBaseDelayMs ?? 1000
 		}
+
+		// Initialize sub-systems
+		this.api = new WAKitRestServer(this, config.rest ?? {})
+		this.scheduler = new WAKitScheduler(config.scheduler ?? {})
+		this.recorder = new WAKitRecorder(config.recorder ?? {})
 	}
 
 	/**
@@ -96,6 +138,11 @@ export class WAKitClient {
 		return this._socket?.authState ?? null
 	}
 
+	/** Read-only diagnostics for all installed plugins */
+	get plugins() {
+		return this._plugins.diagnostics()
+	}
+
 	// ─── Connection lifecycle ────────────────────────────────────────────────
 
 	/** @internal Called by createClient after auth state is resolved */
@@ -107,6 +154,17 @@ export class WAKitClient {
 		this._socket = makeWASocket(this._socketConfig)
 		this._reattachListeners()
 		this._wireAutoReconnect()
+
+		// Start the scheduler and wire sendMessage
+		this.scheduler._setSendMessage((jid, content) => this.sendMessage(jid, content))
+		this.scheduler.start()
+
+		// Wire the recorder to this socket's event system
+		this.recorder._wire(
+			(event, listener) => this._socket?.ev.on(event, listener),
+			(event, listener) => this._socket?.ev.off(event, listener),
+			(event, data) => this._socket?.ev.emit(event, data)
+		)
 	}
 
 	/**
@@ -115,6 +173,12 @@ export class WAKitClient {
 	 */
 	async destroy(): Promise<void> {
 		this._destroyed = true
+
+		// Stop sub-systems
+		this.scheduler.stop()
+		if (this.api.isRunning) {
+			await this.api.stop()
+		}
 
 		// Uninstall all plugins in reverse order
 		const pluginNames = this._plugins.installedNames().reverse()
@@ -184,15 +248,37 @@ export class WAKitClient {
 
 	/**
 	 * Register and install a WAKit plugin.
+	 * Calls the full lifecycle: initialize → install.
+	 * Call `client.pluginsReady()` after all plugins are registered to trigger `ready()`.
 	 *
 	 * @example
 	 * ```ts
-	 * client.use(myAnalyticsPlugin)
+	 * await client.use(myAnalyticsPlugin)
+	 * await client.use(WebhookPlugin({ url: 'https://...' }))
+	 * await client.pluginsReady()
 	 * ```
 	 */
 	async use(plugin: WAKitPlugin): Promise<this> {
 		await this._plugins.install(plugin, this)
 		return this
+	}
+
+	/**
+	 * Signal that all plugins have been installed.
+	 * This triggers the `ready()` lifecycle hook on each plugin.
+	 * Call once after all `client.use()` calls.
+	 */
+	async pluginsReady(): Promise<void> {
+		await this._plugins.callReady(this)
+	}
+
+	/**
+	 * Reload a plugin by name (uninstall + reinstall).
+	 * @param name The plugin name to reload.
+	 * @param newPlugin Optional replacement plugin definition.
+	 */
+	async reloadPlugin(name: string, newPlugin?: WAKitPlugin): Promise<void> {
+		await this._plugins.reload(name, this, newPlugin)
 	}
 
 	// ─── Middleware API ───────────────────────────────────────────────────────
@@ -201,22 +287,29 @@ export class WAKitClient {
 	 * Add middleware to the incoming message pipeline.
 	 * Middleware runs in registration order for each decrypted incoming message.
 	 *
+	 * @param middleware The middleware function.
+	 * @param id Optional identifier for later removal/toggling.
+	 * @returns The assigned middleware ID.
+	 *
 	 * @example
 	 * ```ts
 	 * client.useIncoming(async (ctx, next) => {
 	 *   console.log('received:', ctx.message.key.id)
 	 *   await next()
-	 * })
+	 * }, 'my-logger')
 	 * ```
 	 */
-	useIncoming(middleware: Middleware<IncomingMessageContext>): this {
-		this._incomingPipeline.use(middleware)
-		return this
+	useIncoming(middleware: Middleware<IncomingMessageContext>, id?: string): string {
+		return this._incomingPipeline.use(middleware, id)
 	}
 
 	/**
 	 * Add middleware to the outgoing message pipeline.
 	 * Middleware runs in registration order before each message is sent.
+	 *
+	 * @param middleware The middleware function.
+	 * @param id Optional identifier for later removal/toggling.
+	 * @returns The assigned middleware ID.
 	 *
 	 * @example
 	 * ```ts
@@ -226,9 +319,24 @@ export class WAKitClient {
 	 * })
 	 * ```
 	 */
-	useOutgoing(middleware: Middleware<OutgoingMessageContext>): this {
-		this._outgoingPipeline.use(middleware)
-		return this
+	useOutgoing(middleware: Middleware<OutgoingMessageContext>, id?: string): string {
+		return this._outgoingPipeline.use(middleware, id)
+	}
+
+	/**
+	 * Remove a middleware from the incoming pipeline by ID.
+	 * @returns true if the middleware was found and removed.
+	 */
+	removeIncoming(id: string): boolean {
+		return this._incomingPipeline.remove(id)
+	}
+
+	/**
+	 * Remove a middleware from the outgoing pipeline by ID.
+	 * @returns true if the middleware was found and removed.
+	 */
+	removeOutgoing(id: string): boolean {
+		return this._outgoingPipeline.remove(id)
 	}
 
 	/** @internal Exposes the incoming pipeline to the socket layer */
@@ -243,7 +351,7 @@ export class WAKitClient {
 
 	// ─── Proxied socket methods (ergonomic shortcuts) ─────────────────────────
 
-	/** Send a message. Proxied from the underlying socket, but runs through the outgoing middleware pipeline first. */
+	/** Send a message. Runs through the outgoing middleware pipeline first. */
 	async sendMessage(
 		jid: string,
 		content: import('../Types').AnyMessageContent,

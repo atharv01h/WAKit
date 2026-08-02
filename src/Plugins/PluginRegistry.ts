@@ -1,7 +1,8 @@
+import { Boom } from '@hapi/boom'
 import type { WAKitPlugin } from './types'
 import type { WAKitClient } from '../client/WAKitClient'
 
-type PluginState = 'installed' | 'failed'
+type PluginState = 'installed' | 'failed' | 'disabled'
 
 interface PluginEntry {
 	plugin: WAKitPlugin
@@ -11,11 +12,12 @@ interface PluginEntry {
 
 /**
  * PluginRegistry manages the full lifecycle of WAKit plugins:
- * - Validates metadata (name, version)
- * - Resolves dependencies via topological sort
- * - Detects circular dependencies
- * - Calls install/uninstall in the correct order
+ * - Validates metadata (name, version, install)
+ * - Resolves dependencies before installation
+ * - Calls initialize → install → (ready after all plugins) lifecycle hooks
+ * - Calls uninstall/destroy on removal
  * - Prevents duplicate registration
+ * - Supports reload (uninstall + reinstall) and enable/disable
  *
  * The registry is owned by WAKitClient and is not meant to be used directly.
  */
@@ -24,7 +26,8 @@ export class PluginRegistry {
 
 	/**
 	 * Install a plugin. Dependencies are validated before installation.
-	 * If installation fails, the plugin is marked as 'failed' and the error is rethrown.
+	 * Lifecycle: validate → dependency check → initialize → install.
+	 * If installation fails, the plugin is NOT added to the registry.
 	 */
 	async install(plugin: WAKitPlugin, client: WAKitClient): Promise<void> {
 		this._validate(plugin)
@@ -35,9 +38,10 @@ export class PluginRegistry {
 		}
 
 		// Resolve dependencies first
-		await this._resolveDependencies(plugin, client, new Set())
+		this._checkDependencies(plugin)
 
 		try {
+			await plugin.initialize?.(client)
 			await plugin.install(client)
 			this._registry.set(plugin.name, {
 				plugin,
@@ -45,45 +49,113 @@ export class PluginRegistry {
 				installedAt: new Date()
 			})
 		} catch (err) {
-			this._registry.set(plugin.name, {
-				plugin,
-				state: 'failed',
-				installedAt: new Date()
-			})
-			throw err
+			// Mark as failed but remove from registry so it can be retried
+			throw new Boom(
+				`Plugin "${plugin.name}" failed during installation: ${err instanceof Error ? err.message : String(err)}`,
+				{ statusCode: 500, data: { err } }
+			)
 		}
 	}
 
 	/**
-	 * Uninstall a plugin by name. Calls plugin.uninstall() if defined.
+	 * Call the `ready()` hook on all installed plugins.
+	 * Invoke this after ALL plugins have been registered.
+	 */
+	async callReady(client: WAKitClient): Promise<void> {
+		for (const [, entry] of this._registry) {
+			if (entry.state === 'installed') {
+				await entry.plugin.ready?.(client)
+			}
+		}
+	}
+
+	/**
+	 * Uninstall a plugin by name. Calls plugin.uninstall() (or destroy()) if defined.
 	 * No-ops if the plugin is not installed.
 	 */
 	async uninstall(name: string, client: WAKitClient): Promise<void> {
 		const entry = this._registry.get(name)
-		if (!entry || entry.state !== 'installed') return
+		if (!entry || entry.state === 'failed') {
+			this._registry.delete(name)
+			return
+		}
 
 		try {
-			await entry.plugin.uninstall?.(client)
+			// Prefer uninstall; fall back to destroy
+			const cleanup = entry.plugin.uninstall ?? entry.plugin.destroy
+			await cleanup?.(client)
 		} finally {
 			this._registry.delete(name)
 		}
 	}
 
-	/** Returns true if a plugin with the given name is installed and healthy */
+	/**
+	 * Reload a plugin: uninstall then reinstall.
+	 * The plugin object is replaced with `newPlugin` if provided, otherwise the
+	 * original plugin definition is reused.
+	 */
+	async reload(name: string, client: WAKitClient, newPlugin?: WAKitPlugin): Promise<void> {
+		const entry = this._registry.get(name)
+		const target = newPlugin ?? entry?.plugin
+		if (!target) {
+			throw new Boom(`Plugin "${name}" not found. Cannot reload a plugin that was never installed.`, {
+				statusCode: 404
+			})
+		}
+
+		await this.uninstall(name, client)
+		await this.install(target, client)
+	}
+
+	/**
+	 * Disable an installed plugin without uninstalling it.
+	 * The plugin's listeners/middleware remain registered — use for temporary pausing.
+	 */
+	disable(name: string): void {
+		const entry = this._registry.get(name)
+		if (!entry) {
+			throw new Boom(`Plugin "${name}" not found.`, { statusCode: 404 })
+		}
+
+		if (entry.state !== 'installed') {
+			throw new Boom(`Plugin "${name}" is not installed.`, { statusCode: 400 })
+		}
+
+		entry.state = 'disabled'
+	}
+
+	/**
+	 * Re-enable a previously disabled plugin.
+	 */
+	enablePlugin(name: string): void {
+		const entry = this._registry.get(name)
+		if (!entry) {
+			throw new Boom(`Plugin "${name}" not found.`, { statusCode: 404 })
+		}
+
+		if (entry.state !== 'disabled') {
+			throw new Boom(`Plugin "${name}" is not disabled.`, { statusCode: 400 })
+		}
+
+		entry.state = 'installed'
+	}
+
+	/** Returns true if a plugin with the given name is installed and active */
 	isInstalled(name: string): boolean {
 		return this._registry.get(name)?.state === 'installed'
 	}
 
-	/** Returns a list of all installed plugin names in installation order */
+	/** Returns a list of all installed (active) plugin names in installation order */
 	installedNames(): string[] {
 		return [...this._registry.entries()].filter(([, e]) => e.state === 'installed').map(([name]) => name)
 	}
 
 	/** Returns diagnostic information about all registered plugins */
-	diagnostics(): Array<{ name: string; version: string; state: PluginState; installedAt: Date }> {
+	diagnostics(): Array<{ name: string; version: string; author?: string; state: PluginState; installedAt: Date }> {
 		return [...this._registry.entries()].map(([name, entry]) => ({
 			name,
 			version: entry.plugin.version,
+			author: entry.plugin.author,
 			state: entry.state,
 			installedAt: entry.installedAt
 		}))
@@ -93,39 +165,33 @@ export class PluginRegistry {
 
 	private _validate(plugin: WAKitPlugin): void {
 		if (!plugin.name || typeof plugin.name !== 'string' || plugin.name.trim() === '') {
-			throw new Error('WAKit plugin: "name" must be a non-empty string')
+			throw new Boom('Plugin "name" must be a non-empty string.', { statusCode: 400 })
 		}
 
 		if (!plugin.version || typeof plugin.version !== 'string') {
-			throw new Error(`WAKit plugin "${plugin.name}": "version" must be a non-empty string`)
+			throw new Boom(`Plugin "${plugin.name}": "version" must be a non-empty string.`, { statusCode: 400 })
 		}
 
 		if (typeof plugin.install !== 'function') {
-			throw new Error(`WAKit plugin "${plugin.name}": "install" must be a function`)
+			throw new Boom(`Plugin "${plugin.name}": "install" must be a function.`, { statusCode: 400 })
 		}
 	}
 
 	/**
-	 * Topologically install all declared dependencies.
-	 * Uses DFS with a visiting set for cycle detection.
+	 * Checks that all declared dependencies are already installed.
+	 * Throws with a clear message if any are missing.
 	 */
-	private async _resolveDependencies(plugin: WAKitPlugin, client: WAKitClient, visiting: Set<string>): Promise<void> {
+	private _checkDependencies(plugin: WAKitPlugin): void {
 		if (!plugin.requires || plugin.requires.length === 0) return
 
 		for (const depName of plugin.requires) {
-			if (visiting.has(depName)) {
-				throw new Error(`WAKit plugin "${plugin.name}": circular dependency detected involving "${depName}"`)
+			if (!this.isInstalled(depName)) {
+				throw new Boom(
+					`Plugin "${plugin.name}" requires plugin "${depName}" which is not installed. ` +
+						`Install "${depName}" before "${plugin.name}".`,
+					{ statusCode: 400 }
+				)
 			}
-
-			if (this.isInstalled(depName)) {
-				// Already installed — nothing to do
-				continue
-			}
-
-			throw new Error(
-				`WAKit plugin "${plugin.name}": required plugin "${depName}" is not installed. ` +
-					`Install it before "${plugin.name}".`
-			)
 		}
 	}
 }

@@ -81,7 +81,9 @@ describe('PluginRegistry', () => {
 			name: 'dependent',
 			requires: ['missing-dep']
 		})
-		await expect(registry.install(plugin, mockClient)).rejects.toThrow('required plugin "missing-dep" is not installed')
+		await expect(registry.install(plugin, mockClient)).rejects.toThrow(
+			/requires plugin "missing-dep" which is not installed/
+		)
 	})
 
 	it('succeeds when all declared dependencies are already installed', async () => {

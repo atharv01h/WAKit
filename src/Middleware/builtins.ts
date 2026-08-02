@@ -1,5 +1,6 @@
+import { LRUCache } from 'lru-cache'
 import type { ILogger } from '../Utils/logger'
-import type { IncomingMessageContext, Middleware, OutgoingMessageContext } from './types'
+import type { IncomingMessageContext, Middleware, OutgoingMessageContext, ErrorMiddleware } from './types'
 
 // ─── Logging Middleware ───────────────────────────────────────────────────────
 
@@ -172,5 +173,75 @@ export function outgoingMetricsMiddleware(collector: SimpleMetricsCollector): Mi
 		const ms = Date.now() - start
 		collector.increment('wakit.messages.sent', { aborted: String(ctx.abort) })
 		collector.timing('wakit.messages.send_ms', ms)
+	}
+}
+
+// ─── Error Logging Middleware ─────────────────────────────────────────────────
+
+/**
+ * Error middleware that logs any error thrown by upstream middleware.
+ * Register via `pipeline.useError(errorLoggingMiddleware(logger))`.
+ *
+ * @example
+ * ```ts
+ * const pipeline = createPipeline<IncomingMessageContext>()
+ * pipeline.useError(errorLoggingMiddleware(logger))
+ * pipeline.use(myMiddleware)
+ * ```
+ */
+export function errorLoggingMiddleware(logger: ILogger): ErrorMiddleware<IncomingMessageContext> {
+	return async (err, ctx, next) => {
+		logger.error(
+			{
+				err,
+				jid: ctx.remoteJid,
+				msgId: ctx.message.key.id
+			},
+			'wakit: unhandled middleware error'
+		)
+		await next()
+	}
+}
+
+// ─── Deduplication Middleware ─────────────────────────────────────────────────
+
+export interface DedupOptions {
+	/**
+	 * Maximum number of message IDs to remember (default: 1000).
+	 * Older IDs are evicted automatically via LRU.
+	 */
+	maxSeen?: number
+}
+
+/**
+ * Drops duplicate incoming messages based on `message.key.id`.
+ * Uses an LRU cache to bound memory usage.
+ *
+ * This is useful when WhatsApp delivers the same message twice (common after
+ * reconnects or multi-device sync events).
+ *
+ * @example
+ * ```ts
+ * client.useIncoming(dedupMiddleware())
+ * ```
+ */
+export function dedupMiddleware(opts: DedupOptions = {}): Middleware<IncomingMessageContext> {
+	const maxSeen = opts.maxSeen ?? 1000
+	const seen = new LRUCache<string, true>({ max: maxSeen })
+
+	return async (ctx, next) => {
+		const id = ctx.message.key.id
+		if (!id) {
+			await next()
+			return
+		}
+
+		if (seen.has(id)) {
+			ctx.drop = true
+			return
+		}
+
+		seen.set(id, true)
+		await next()
 	}
 }

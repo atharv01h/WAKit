@@ -59,10 +59,12 @@ WAKit introduces:
 WAKit introduces several next-generation architectural improvements over standard clients:
 
 - **Next-Gen `WAKitClient`:** A unified client wrapper (`createClient`) that handles authentication and socket lifecycle automatically.
-- **Middleware Pipeline:** Intercept, modify, rate-limit, and log incoming and outgoing messages seamlessly using `createPipeline`.
-- **Plugin System (`definePlugin`):** Easily build, share, and consume third-party WAKit plugins to extend functionality without bloating the core.
-- **Pluggable Storage:** Native `MemoryStore` and `JsonFileStore` for managing authentication credentials, with support for custom database adapters (e.g., PostgreSQL, Redis).
-- **Circuit Breakers & Telemetry:** Built-in safeguards for API limits and network failures, alongside pluggable `NoopTelemetry` interfaces for production monitoring.
+- **Middleware Pipeline:** Intercept, modify, rate-limit, and log incoming and outgoing messages seamlessly. Includes built-in `dedupMiddleware`, `rateLimitMiddleware`, and group-scoped pipelines.
+- **Plugin System (`definePlugin`):** A robust lifecycle system (`initialize`, `install`, `ready`, `destroy`) with dependency checking. Includes built-in `LoggerPlugin` and `WebhookPlugin`.
+- **REST API Generator:** Expose WAKit via an Express server dynamically. Includes API key auth, rate-limiting, and an auto-generated Swagger UI (`/docs`) and OpenAPI 3.1 spec.
+- **Job Scheduler:** A `node-cron` powered task runner attached directly to the client. Schedule recurring jobs, one-shot WhatsApp message sends, and persist job state across restarts.
+- **Event Recorder & Replay:** Log every socket event to disk and replay them offline at varying speeds (or step-by-step) for ultimate debugging without needing a live device connection.
+- **Pluggable Storage:** Native `MemoryStore` and `JsonFileStore` for managing authentication credentials.
 
 ---
 
@@ -245,6 +247,10 @@ WAKit/
 ## 🔍 API Overview
 
 - `createClient(config)`: The modern entrypoint for WAKit. Returns a `WAKitClient`.
+- `client.use(plugin)`: Register a plugin.
+- `client.api.start()`: Spin up the WAKit REST API server.
+- `client.scheduler.cron(...)`: Schedule background jobs or automated messages.
+- `client.recorder.start()`: Begin capturing all WhatsApp events for debugging.
 - `makeWASocket(config)`: The low-level socket constructor (Baileys compatible).
 - `definePlugin(plugin)`: Type-safe plugin constructor.
 - `createPipeline()`: Instantiates a middleware pipeline for message interception.
@@ -284,9 +290,13 @@ A: Absolutely not. We do not accept or support usage whose primary purpose is to
 ## 🗺️ Roadmap
 
 - [x] Complete Next-Gen `WAKitClient` wrapper.
+- [x] Middleware system with named pipelines.
+- [x] Plugin Registry and lifecycle.
+- [x] Integrated Express REST API Generator & Swagger UI.
+- [x] Event Recorder and Time-travel Replay.
+- [x] Built-in Job Scheduler.
 - [x] Pluggable Storage Adapters (`JsonFileStore`).
 - [ ] First-class Database Adapters (PostgreSQL/Redis) natively included.
-- [ ] Standardized community Plugin Registry.
 - [ ] Improved documentation site built with VitePress.
 
 ---

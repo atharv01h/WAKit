@@ -1,11 +1,22 @@
 export { createPipeline } from './createPipeline'
-export type { Middleware, MiddlewarePipeline, IncomingMessageContext, OutgoingMessageContext } from './types'
+export { createGroupPipeline } from './group-pipeline'
+export type { GroupPipeline } from './group-pipeline'
+export type {
+	Middleware,
+	ErrorMiddleware,
+	MiddlewarePipeline,
+	NamedMiddlewareEntry,
+	IncomingMessageContext,
+	OutgoingMessageContext
+} from './types'
 export {
 	incomingLoggingMiddleware,
 	outgoingLoggingMiddleware,
 	rateLimitMiddleware,
 	filterJidMiddleware,
 	incomingMetricsMiddleware,
-	outgoingMetricsMiddleware
+	outgoingMetricsMiddleware,
+	errorLoggingMiddleware,
+	dedupMiddleware
 } from './builtins'
-export type { RateLimitOptions, SimpleMetricsCollector } from './builtins'
+export type { RateLimitOptions, SimpleMetricsCollector, DedupOptions } from './builtins'

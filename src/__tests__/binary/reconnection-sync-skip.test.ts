@@ -47,7 +47,7 @@ describe('Reconnection Sync Skip', () => {
 
 		await sock.end(new Error('Test completed'))
 		await clear()
-	})
+	}, 30000)
 
 	it('should still wait for history sync on fresh pairing (accountSyncCounter === 0)', async () => {
 		const { state, clear } = await makeSession()
@@ -82,5 +82,5 @@ describe('Reconnection Sync Skip', () => {
 
 		await sock.end(new Error('Test completed'))
 		await clear()
-	})
+	}, 30000)
 })

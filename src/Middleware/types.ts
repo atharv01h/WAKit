@@ -18,12 +18,62 @@ import type { MiscMessageGenerationOptions } from '../Types/Message'
 export type Middleware<TContext> = (ctx: TContext, next: () => Promise<void>) => Promise<void>
 
 /**
+ * An error-handling middleware function. Called when a normal middleware throws.
+ * Receives the error plus the context and next function.
+ *
+ * @example
+ * ```ts
+ * const errorMw: ErrorMiddleware<IncomingMessageContext> = async (err, ctx, next) => {
+ *   console.error('middleware error:', err)
+ *   await next() // optionally continue chain
+ * }
+ * ```
+ */
+export type ErrorMiddleware<TContext> = (err: unknown, ctx: TContext, next: () => Promise<void>) => Promise<void>
+
+/**
+ * A named middleware entry — same as Middleware but with an optional
+ * identifier for later removal or toggling.
+ */
+export interface NamedMiddlewareEntry<TContext> {
+	id: string
+	fn: Middleware<TContext>
+	enabled: boolean
+}
+
+/**
  * A composed middleware pipeline. Use `.use()` to add middleware
  * and `.execute()` to run the pipeline against a context.
  */
 export interface MiddlewarePipeline<TContext> {
-	/** Add a middleware to the end of the pipeline */
-	use(middleware: Middleware<TContext>): void
+	/**
+	 * Add a middleware to the end of the pipeline.
+	 * @param middleware The middleware function to add.
+	 * @param id Optional identifier for later removal/toggling. Auto-generated if omitted.
+	 * @returns The assigned id.
+	 */
+	use(middleware: Middleware<TContext>, id?: string): string
+	/**
+	 * Add an error-handling middleware. Error middleware runs when a preceding
+	 * middleware throws, and does NOT run in the normal flow.
+	 */
+	useError(middleware: ErrorMiddleware<TContext>): void
+	/**
+	 * Remove a middleware by its id.
+	 * @returns true if a middleware with that id was found and removed.
+	 */
+	remove(id: string): boolean
+	/**
+	 * Disable a middleware by id without removing it.
+	 * Disabled middleware are skipped during execution.
+	 * @returns true if found.
+	 */
+	disable(id: string): boolean
+	/**
+	 * Re-enable a previously disabled middleware by id.
+	 * @returns true if found.
+	 */
+	enable(id: string): boolean
 	/**
 	 * Execute all middleware in registration order against the given context.
 	 * If no middleware is registered, this is a zero-overhead no-op.
@@ -31,6 +81,8 @@ export interface MiddlewarePipeline<TContext> {
 	execute(ctx: TContext): Promise<void>
 	/** Whether any middleware has been registered */
 	readonly hasMiddleware: boolean
+	/** Returns a snapshot of all registered middleware entries */
+	entries(): ReadonlyArray<Readonly<NamedMiddlewareEntry<TContext>>>
 }
 
 // ─── Incoming Message Context ─────────────────────────────────────────────────
