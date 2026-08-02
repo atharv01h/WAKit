@@ -114,7 +114,10 @@ export async function createClient(config: WAKitClientConfig): Promise<WAKitClie
 	// Wire auto-save before first connect so no creds.update is missed
 	if (autoSaveCreds) {
 		const saveCreds = (config as WAKitClientConfig & { _saveCreds?: () => Promise<void> })._saveCreds!
-		client.on('creds.update', () => {
+		client.on('creds.update', (update) => {
+			if (client.authState?.creds && update) {
+				Object.assign(client.authState.creds, update)
+			}
 			saveCreds().catch((err: unknown) => {
 				socketConfig.logger?.error({ err }, 'wakit: failed to auto-save credentials')
 			})

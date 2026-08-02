@@ -3,7 +3,7 @@ import type { WAKitEventEmitter, WAKitEventMap } from '../Types'
 // ─── Ring Buffer ──────────────────────────────────────────────────────────────
 
 /** A fixed-capacity ring buffer for O(1) append and O(N) iteration */
-class RingBuffer<T> {
+export class RingBuffer<T> {
 	private readonly _buf: Array<T | undefined>
 	private _head = 0
 	private _size = 0

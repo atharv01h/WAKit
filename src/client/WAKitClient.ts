@@ -15,6 +15,7 @@ import { WAKitScheduler } from '../Scheduler/WAKitScheduler'
 import type { SchedulerConfig } from '../Scheduler/types'
 import { WAKitRecorder } from '../Recorder/WAKitRecorder'
 import type { RecorderConfig } from '../Recorder/types'
+import { RingBuffer, type EventHistoryEntry, type WAKitEventBusOptions } from '../Utils/event-bus'
 
 type WASocket = ReturnType<typeof makeWASocket>
 
@@ -35,6 +36,8 @@ export interface WAKitClientConfig extends Omit<Partial<UserFacingSocketConfig>,
 	scheduler?: SchedulerConfig
 	/** Recorder configuration */
 	recorder?: RecorderConfig
+	/** Event Bus configuration (e.g., history capacity) */
+	eventBus?: WAKitEventBusOptions
 }
 
 /**
@@ -90,6 +93,14 @@ export class WAKitClient {
 		Array<(arg: WAKitEventMap[keyof WAKitEventMap]) => void>
 	>()
 
+	// Pending process handlers that should be re-registered on reconnect
+	private readonly _processHandlers: Array<(events: Partial<WAKitEventMap>) => void | Promise<void>> = []
+
+	// ─── Event Bus State ─────────────────────────────────────────────────────
+	private readonly _eventRings = new Map<keyof WAKitEventMap, RingBuffer<EventHistoryEntry>>()
+	private _eventRecording: EventHistoryEntry[] | null = null
+	private readonly _eventBusConfig: WAKitEventBusOptions
+
 	// ─── Sub-systems ─────────────────────────────────────────────────────────
 
 	/** The REST API server subsystem. Call .start() to begin listening. */
@@ -113,6 +124,7 @@ export class WAKitClient {
 		this.api = new WAKitRestServer(this, config.rest ?? {})
 		this.scheduler = new WAKitScheduler(config.scheduler ?? {})
 		this.recorder = new WAKitRecorder(config.recorder ?? {})
+		this._eventBusConfig = config.eventBus ?? {}
 	}
 
 	/**
@@ -152,6 +164,18 @@ export class WAKitClient {
 		}
 
 		this._socket = makeWASocket(this._socketConfig)
+
+		// Intercept emit on the socket to record history
+		const originalEmit = this._socket.ev.emit.bind(this._socket.ev)
+		this._socket.ev.emit = <E extends keyof WAKitEventMap>(event: E, data: WAKitEventMap[E]): boolean => {
+			const entry: EventHistoryEntry<E> = { event, data, timestamp: new Date() }
+			this._getRing(event).push(entry)
+			if (this._eventRecording) {
+				this._eventRecording.push(entry)
+			}
+			return originalEmit(event, data)
+		}
+
 		this._reattachListeners()
 		this._wireAutoReconnect()
 
@@ -238,10 +262,76 @@ export class WAKitClient {
 
 	/**
 	 * Process all events in a single batch handler (same as sock.ev.process).
-	 * This handler is NOT automatically re-attached on reconnect; use on() for that.
+	 * Handlers registered here are automatically re-attached on reconnect.
 	 */
 	process(handler: (events: Partial<WAKitEventMap>) => void | Promise<void>): () => void {
-		return this._socket!.ev.process(handler)
+		this._processHandlers.push(handler)
+		
+		let socketUnsub: (() => void) | undefined
+		if (this._socket) {
+			socketUnsub = this._socket.ev.process(handler)
+		}
+		
+		return () => {
+			const idx = this._processHandlers.indexOf(handler)
+			if (idx !== -1) {
+				this._processHandlers.splice(idx, 1)
+			}
+			if (socketUnsub) socketUnsub()
+		}
+	}
+
+	/**
+	 * Subscribe to an event, but only when the predicate returns true.
+	 * Returns an unsubscribe function.
+	 */
+	filter<E extends keyof WAKitEventMap>(
+		event: E,
+		predicate: (data: WAKitEventMap[E]) => boolean,
+		listener: (data: WAKitEventMap[E]) => void
+	): () => void {
+		const wrapped = (data: WAKitEventMap[E]) => {
+			if (predicate(data)) {
+				listener(data)
+			}
+		}
+
+		this.on(event, wrapped)
+		return () => this.off(event, wrapped)
+	}
+
+	/**
+	 * Replay all buffered history for the given event.
+	 * Calls listener synchronously for each stored entry (oldest first).
+	 */
+	replay<E extends keyof WAKitEventMap>(event: E, listener: (data: WAKitEventMap[E]) => void, since?: Date): void {
+		const ring = this._getRing(event)
+		const entries = ring.toArray()
+		for (const entry of entries) {
+			if (!since || entry.timestamp > since) {
+				listener(entry.data)
+			}
+		}
+	}
+
+	/**
+	 * Start capturing all events to an in-memory recording.
+	 * Returns a stop function that returns the captured events.
+	 */
+	record(): () => EventHistoryEntry[] {
+		this._eventRecording = []
+		const captured = this._eventRecording
+		return () => {
+			this._eventRecording = null
+			return captured
+		}
+	}
+
+	/**
+	 * Returns the ring-buffer history for a given event type.
+	 */
+	history<E extends keyof WAKitEventMap>(event: E): EventHistoryEntry<E>[] {
+		return this._getRing(event).toArray()
 	}
 
 	// ─── Plugin API ───────────────────────────────────────────────────────────
@@ -394,6 +484,14 @@ export class WAKitClient {
 
 	// ─── Internal helpers ─────────────────────────────────────────────────────
 
+	private _getRing<E extends keyof WAKitEventMap>(event: E): RingBuffer<EventHistoryEntry<E>> {
+		if (!this._eventRings.has(event)) {
+			this._eventRings.set(event, new RingBuffer<EventHistoryEntry>(this._eventBusConfig.historyCapacity ?? 100))
+		}
+
+		return this._eventRings.get(event) as RingBuffer<EventHistoryEntry<E>>
+	}
+
 	private _reattachListeners(): void {
 		if (!this._socket) return
 		for (const [event, listeners] of this._eventListeners) {
@@ -433,6 +531,10 @@ export class WAKitClient {
 				}
 			}
 		}
+
+		for (const handler of this._processHandlers) {
+			this._socket.ev.process(handler)
+		}
 	}
 
 	private _wireAutoReconnect(): void {
@@ -440,6 +542,12 @@ export class WAKitClient {
 
 		this._socket.ev.on('connection.update', async (update: Partial<ConnectionState>) => {
 			const { connection, lastDisconnect } = update
+			
+			if (connection === 'open') {
+				this._reconnectAttempts = 0
+				return
+			}
+			
 			if (connection !== 'close' || this._destroyed) return
 
 			const statusCode = (lastDisconnect?.error as Boom | undefined)?.output?.statusCode

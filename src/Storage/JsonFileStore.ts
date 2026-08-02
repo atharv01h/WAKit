@@ -29,6 +29,10 @@ export class JsonFileStore implements WAKitStore {
 	private readonly _fileLocks = new Map<string, Mutex>()
 	private _initialized = false
 
+	// In-memory cache for signal data
+	private _keysData: Record<string, Record<string, any>> | null = null
+	private _flushTimer: ReturnType<typeof setTimeout> | null = null
+
 	constructor(folder: string) {
 		this._folder = resolve(folder)
 	}
@@ -46,11 +50,21 @@ export class JsonFileStore implements WAKitStore {
 			await mkdir(this._folder, { recursive: true })
 		}
 
+		// Load keys from keys.json if it exists
+		if (this._keysData === null) {
+			this._keysData = (await this._readJson<Record<string, Record<string, any>>>('keys.json')) ?? {}
+		}
+
 		this._initialized = true
 	}
 
 	async close(): Promise<void> {
-		// No persistent connections to close
+		// Flush any pending keys on close
+		if (this._flushTimer) {
+			clearTimeout(this._flushTimer)
+			this._flushTimer = null
+			await this._flushKeys()
+		}
 	}
 
 	// ─── Auth credentials ──────────────────────────────────────────────────
@@ -79,42 +93,79 @@ export class JsonFileStore implements WAKitStore {
 		await this.initialize()
 		const result: { [id: string]: SignalDataTypeMap[T] } = {}
 
+		if (!this._keysData![type]) {
+			this._keysData![type] = {}
+		}
+
+		let needsFlush = false
+
 		await Promise.all(
 			ids.map(async id => {
-				const filename = this._signalFilename(type, id)
-				const raw = await this._readJson<SignalDataTypeMap[T]>(filename)
-				if (raw !== null) {
+				let value = this._keysData![type][id]
+				if (value === undefined) {
+					// Fallback to old individual file format for backward compatibility
+					const filename = this._signalFilename(type, id)
+					const raw = await this._readJson<any>(filename)
+					if (raw !== null) {
+						value = raw
+						this._keysData![type][id] = value // migrate to keys.json
+						needsFlush = true
+					}
+				}
+
+				if (value !== undefined && value !== null) {
 					// app-state-sync-key values need protobuf reconstruction
 					result[id] =
-						type === 'app-state-sync-key' && raw
-							? (proto.Message.AppStateSyncKeyData.fromObject(raw as object) as unknown as SignalDataTypeMap[T])
-							: raw
+						type === 'app-state-sync-key' && value
+							? (proto.Message.AppStateSyncKeyData.fromObject(value as object) as unknown as SignalDataTypeMap[T])
+							: value
 				}
 			})
 		)
+
+		if (needsFlush) {
+			this._scheduleFlush()
+		}
 
 		return result
 	}
 
 	async setSignalData(data: SignalDataSet): Promise<void> {
 		await this.initialize()
-		const tasks: Promise<void>[] = []
 
 		for (const type in data) {
 			const typeData = data[type as keyof SignalDataTypeMap]
 			if (!typeData) continue
+
+			if (!this._keysData![type]) {
+				this._keysData![type] = {}
+			}
+
 			for (const id in typeData) {
-				const filename = this._signalFilename(type as keyof SignalDataTypeMap, id)
 				const value = typeData[id]
 				if (value === null || value === undefined) {
-					tasks.push(this._deleteFile(filename))
+					delete this._keysData![type][id]
 				} else {
-					tasks.push(this._writeJson(filename, value))
+					this._keysData![type][id] = value
 				}
 			}
 		}
 
-		await Promise.all(tasks)
+		this._scheduleFlush()
+	}
+
+	private _scheduleFlush() {
+		if (this._flushTimer) {
+			clearTimeout(this._flushTimer)
+		}
+		this._flushTimer = setTimeout(() => {
+			this._flushTimer = null
+			this._flushKeys().catch(() => {})
+		}, 50)
+	}
+
+	private async _flushKeys() {
+		await this._writeJson('keys.json', this._keysData)
 	}
 
 	// ─── Chat state ───────────────────────────────────────────────────────

@@ -40,9 +40,11 @@ export class PluginRegistry {
 		// Resolve dependencies first
 		this._checkDependencies(plugin)
 
+		const proxiedClient = this._createPluginClientProxy(client, plugin.name)
+
 		try {
-			await plugin.initialize?.(client)
-			await plugin.install(client)
+			await plugin.initialize?.(proxiedClient)
+			await plugin.install(proxiedClient)
 			this._registry.set(plugin.name, {
 				plugin,
 				state: 'installed',
@@ -64,7 +66,8 @@ export class PluginRegistry {
 	async callReady(client: WAKitClient): Promise<void> {
 		for (const [, entry] of this._registry) {
 			if (entry.state === 'installed') {
-				await entry.plugin.ready?.(client)
+				const proxiedClient = this._createPluginClientProxy(client, entry.plugin.name)
+				await entry.plugin.ready?.(proxiedClient)
 			}
 		}
 	}
@@ -83,7 +86,10 @@ export class PluginRegistry {
 		try {
 			// Prefer uninstall; fall back to destroy
 			const cleanup = entry.plugin.uninstall ?? entry.plugin.destroy
-			await cleanup?.(client)
+			if (cleanup) {
+				const proxiedClient = this._createPluginClientProxy(client, name)
+				await cleanup(proxiedClient)
+			}
 		} finally {
 			this._registry.delete(name)
 		}
@@ -193,5 +199,70 @@ export class PluginRegistry {
 				)
 			}
 		}
+	}
+
+	/**
+	 * Wraps the WAKitClient in a proxy that intercepts event listeners and middleware.
+	 * When the plugin is disabled, these hooks automatically become no-ops.
+	 */
+	private _createPluginClientProxy(client: WAKitClient, pluginName: string): WAKitClient {
+		const listenerMap = new WeakMap<Function, Function>()
+		
+		return new Proxy(client, {
+			get: (target, prop, receiver) => {
+				const value = Reflect.get(target, prop, receiver)
+				if (typeof value !== 'function') return value
+
+				if (prop === 'on') {
+					return (event: any, listener: Function) => {
+						const wrappedListener = (...args: any[]) => {
+							if (this.isInstalled(pluginName)) return listener(...args)
+						}
+						listenerMap.set(listener, wrappedListener)
+						target.on(event, wrappedListener as any)
+						return receiver
+					}
+				}
+				
+				if (prop === 'off') {
+					return (event: any, listener: Function) => {
+						const wrapped = listenerMap.get(listener)
+						target.off(event, (wrapped ?? listener) as any)
+						return receiver
+					}
+				}
+
+				if (prop === 'useIncoming') {
+					return (middleware: any, id?: string) => {
+						const wrappedMiddleware = async (ctx: any, next: any) => {
+							if (this.isInstalled(pluginName)) return middleware(ctx, next)
+							return next()
+						}
+						return target.useIncoming(wrappedMiddleware, id)
+					}
+				}
+
+				if (prop === 'useOutgoing') {
+					return (middleware: any, id?: string) => {
+						const wrappedMiddleware = async (ctx: any, next: any) => {
+							if (this.isInstalled(pluginName)) return middleware(ctx, next)
+							return next()
+						}
+						return target.useOutgoing(wrappedMiddleware, id)
+					}
+				}
+				
+				if (prop === 'process') {
+					return (handler: Function) => {
+						const wrappedHandler = (...args: any[]) => {
+							if (this.isInstalled(pluginName)) return handler(...args)
+						}
+						return target.process(wrappedHandler as any)
+					}
+				}
+
+				return value.bind(target)
+			}
+		})
 	}
 }
