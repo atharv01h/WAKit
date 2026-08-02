@@ -1,195 +1,317 @@
 <div align="center">
-  <h1>🚀 WAKit</h1>
-  <p><b>The Next-Generation TypeScript WhatsApp SDK</b></p>
-  
-  <p>
-    <a href="https://github.com/atharv01h/WAKit/actions"><img src="https://img.shields.io/github/actions/workflow/status/atharv01h/WAKit/test.yml?branch=main&style=flat-square&logo=github" alt="Build Status"></a>
-    <a href="https://www.npmjs.com/package/@atharvh01/wakit"><img src="https://img.shields.io/npm/v/@atharvh01/wakit?style=flat-square&color=blue" alt="NPM Version"></a>
-    <a href="https://www.npmjs.com/package/@atharvh01/wakit"><img src="https://img.shields.io/npm/dt/@atharvh01/wakit?style=flat-square&color=green" alt="NPM Downloads"></a>
-    <a href="https://github.com/atharv01h/WAKit/blob/main/LICENSE"><img src="https://img.shields.io/npm/l/@atharvh01/wakit?style=flat-square&color=orange" alt="License"></a>
-  </p>
+  <h1>WAKit</h1>
+  <p><strong>A modern, powerful, and developer-friendly WebSockets library for WhatsApp Web.</strong></p>
+
+  [![npm version](https://img.shields.io/npm/v/@atharvh01/wakit.svg)](https://www.npmjs.com/package/@atharvh01/wakit)
+  [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 </div>
 
----
-
-**WAKit** is a powerful, reliable, and enterprise-ready TypeScript library for interacting with the WhatsApp Web Noise protocol. Built from the ground up for developer experience, it provides a highly extensible architecture featuring middleware pipelines, modular plugins, atomic storage systems, and advanced event routing.
-
-If you are building WhatsApp bots, automation workflows, CRM integrations, or massive broadcast systems, WAKit provides the scalable foundation you need.
-
-> [!NOTE]  
-> **Project Status**: WAKit is currently in active development and is not yet perfect. I am continuously working to upgrade and improve the system. I hope you guys like it, and I strongly encourage everyone to do your best contributions to help make this the ultimate WhatsApp SDK!
-
-### A Respectful Nod to Baileys
-WAKit was born as an architectural evolution of the legendary [Baileys](https://github.com/WhiskeySockets/Baileys) library. I have immense respect for the Baileys creators and contributors who provided the foundational protocol reverse-engineering that made this possible. WAKit is my humble attempt to upgrade and build upon that incredible foundation to offer a new, production-grade developer experience.
-
-> [!IMPORTANT]  
-> **WAKit is dual-use software.** We strictly prohibit the use of this library for spam, stalkerware, or non-consensual data scraping. Please review our [Code of Conduct](./CODE_OF_CONDUCT.md) before building.
+> 🚧 **WAKit is currently under active development.**
+> While the library is functional and highly capable, some features may still contain bugs or change before stable releases. Bug reports, feature requests, and pull requests are highly appreciated.
 
 ---
 
-## ✨ Features
-
-- **Object-Oriented Client Layer**: Encapsulated `WAKitClient` for clean session and lifecycle management.
-- **Middleware Pipelines**: Intercept, mutate, or drop incoming and outgoing messages seamlessly (similar to Express/Koa).
-- **Plugin Architecture**: Extend the core functionality by hooking into the lifecycle without modifying the base protocol logic.
-- **Advanced Event Bus**: Replay events, filter event streams, and maintain local ring-buffer histories for flawless sync resilience.
-- **Atomic Storage**: Ship with `JsonFileStore` and `MemoryStore` out of the box, utilizing asynchronous mutexes and batched writes to prevent state corruption during high-throughput history syncs.
-- **Resilience**: Built-in Circuit Breakers and configurable retry logic.
-- **Type-Safe**: 100% Strict TypeScript compliance. No arbitrary `any` casting in public APIs.
+## 📑 Table of Contents
+- [Introduction](#introduction)
+- [Why WAKit?](#why-wakit)
+- [What's New in WAKit](#whats-new-in-wakit)
+- [Comparison](#comparison)
+- [Features](#features)
+- [Installation](#installation)
+- [Quick Start](#quick-start)
+- [Usage Examples](#usage-examples)
+- [Project Structure](#project-structure)
+- [API Overview](#api-overview)
+- [Performance](#performance)
+- [FAQ](#faq)
+- [Known Limitations](#known-limitations)
+- [Roadmap](#roadmap)
+- [Contributing](#contributing)
+- [License](#license)
+- [Creator](#creator)
 
 ---
 
+## 👋 Introduction
 
+**WAKit** is a complete typescript-based WebSockets client for the WhatsApp Web protocol. It speaks the binary Noise/protobuf protocol directly—meaning there are no heavy browser automation tools like Puppeteer or Selenium required. 
+
+Originally built as a modern evolution of the popular Baileys library, WAKit takes the heavy lifting out of WhatsApp automation by providing a radically simplified API, robust plugin architecture, and enterprise-grade middleware pipelines.
+
+Whether you are building simple chat bots, complex customer support tools, or advanced integrations, WAKit provides a clean, predictable, and highly scalable foundation.
+
+---
+
+## 🚀 Why WAKit?
+
+WAKit was born out of a need for better developer ergonomics. While traditional libraries give you raw access to the protocol, they often leave you to handle complex state management, reconnection logic, and event routing yourself. 
+
+WAKit introduces:
+- **Better Developer Experience:** A highly abstracted `createClient` API that hides boilerplate.
+- **Cleaner APIs:** Say goodbye to deeply nested configuration objects and sprawling event listeners.
+- **Easier Onboarding:** Start sending messages in less than 5 lines of code.
+- **Better Organization:** Dedicated modules for Middleware, Plugins, Storage, and Telemetry.
+
+---
+
+## ✨ What's New in WAKit
+
+WAKit introduces several next-generation architectural improvements over standard clients:
+
+- **Next-Gen `WAKitClient`:** A unified client wrapper (`createClient`) that handles authentication and socket lifecycle automatically.
+- **Middleware Pipeline:** Intercept, modify, rate-limit, and log incoming and outgoing messages seamlessly using `createPipeline`.
+- **Plugin System (`definePlugin`):** Easily build, share, and consume third-party WAKit plugins to extend functionality without bloating the core.
+- **Pluggable Storage:** Native `MemoryStore` and `JsonFileStore` for managing authentication credentials, with support for custom database adapters (e.g., PostgreSQL, Redis).
+- **Circuit Breakers & Telemetry:** Built-in safeguards for API limits and network failures, alongside pluggable `NoopTelemetry` interfaces for production monitoring.
+
+---
+
+## ⚖️ Comparison
+
+| Feature | Baileys | WAKit |
+|----------|----------|--------|
+| JavaScript Support | ✅ | ✅ |
+| TypeScript Support | ✅ | ✅ |
+| Developer Experience | Good | **Excellent** |
+| API Simplicity | Low-level socket | **High-level Client** |
+| Plugin Ecosystem | ❌ | ✅ **Native Plugin Registry** |
+| Message Middleware | ❌ | ✅ **Native Pipeline** |
+| Code Organization | Monolithic | **Modular Domain Driven** |
+| Storage Adapters | Manual implementation | **Built-in `JsonFileStore` & `MemoryStore`** |
+| Rate Limiting | Bring-your-own | **Built-in Middleware** |
+| Learning Curve | Steep | **Beginner Friendly** |
+
+---
+
+## 🛠 Features
+
+- **Direct Protocol Communication:** Fast, lightweight WebSocket connections without browsers.
+- **Multi-Device Support:** Full compatibility with the latest WhatsApp Multi-Device architecture.
+- **Rich Message Support:** Send text, images, videos, documents, audio, and contacts.
+- **Interactive Messages:** Full support for polls and reactions.
+- **Authentication:** QR code generation and 8-digit Pairing Code support.
+- **Group Management:** Create groups, update metadata, manage admins, and handle invites.
+- **Next-Gen Abstractions:** Middleware, Plugins, Event Bus, and Circuit Breakers.
+
+---
 
 ## 📦 Installation
 
-WAKit requires **Node.js ≥ 20.0.0** and uses **Yarn 4** (via Corepack).
+WAKit requires **Node.js ≥ 20.0.0**.
+
+Using your favorite package manager:
 
 ```bash
 npm install @atharvh01/wakit
-# or
+```
+
+```bash
 yarn add @atharvh01/wakit
-# or
+```
+
+```bash
 pnpm add @atharvh01/wakit
 ```
 
+```bash
+bun add @atharvh01/wakit
+```
+
 ---
 
-## 🚀 Quickstart
+## ⚡ Quick Start
 
-Setting up a robust WhatsApp client with WAKit takes only a few lines of code.
+Get your bot up and running in under a minute using the new `createClient` API:
 
 ```typescript
-import { createClient, JsonFileStore, incomingLoggingMiddleware } from '@atharvh01/wakit'
+import { createClient } from '@atharvh01/wakit';
 
-async function main() {
-  // 1. Initialize an atomic JSON store for session keys
-  const store = new JsonFileStore('./wakit_auth_info')
-  await store.initialize()
+async function start() {
+    // Automatically creates/loads auth state from the provided directory
+    const client = await createClient({ auth: './my-auth-session' });
 
-  // 2. Create the WAKit Client
-  const client = await createClient({
-    auth: store,
-    printQRInTerminal: true,
-    autoReconnect: true,
-  })
+    // Listen for incoming messages
+    client.on('messages.upsert', async (event) => {
+        const msg = event.messages[0];
+        
+        // Ignore messages from ourselves
+        if (msg.key.fromMe) return;
 
-  // 3. Mount Middleware (e.g., Logging, Rate Limiting)
-  client.useIncoming(incomingLoggingMiddleware(client.logger))
+        const text = msg.message?.conversation || msg.message?.extendedTextMessage?.text;
 
-  // 4. Listen to the Enhanced Event Bus
-  client.on('connection.update', (update) => {
-    const { connection, qr } = update
-    if (connection === 'open') {
-      console.log('✅ Connected to WhatsApp!')
-    }
-  })
-
-  client.on('messages.upsert', async ({ messages, type }) => {
-    if (type !== 'notify') return
-    
-    for (const msg of messages) {
-      if (!msg.message || msg.key.fromMe) continue
-      
-      const jid = msg.key.remoteJid!
-      const text = msg.message.conversation || msg.message.extendedTextMessage?.text
-      
-      if (text === '!ping') {
-        // 5. Send messages through the Outgoing Pipeline
-        await client.sendMessage(jid, { text: 'pong 🏓' })
-      }
-    }
-  })
-
-  // 6. Connect!
-  await client.connect()
+        if (text === 'ping') {
+            await client.sendMessage(msg.key.remoteJid!, { text: 'pong!' });
+        }
+    });
 }
 
-main().catch(console.error)
+start();
+```
+
+*(Note: The first time you run this, a QR code will be printed to your console. Scan it with your WhatsApp mobile app to link the device.)*
+
+---
+
+## 📘 Usage Examples
+
+<details>
+<summary><strong>Authentication via Pairing Code (No QR)</strong></summary>
+
+```typescript
+import { createClient } from '@atharvh01/wakit';
+import readline from 'readline';
+
+const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+const question = (text: string) => new Promise<string>((resolve) => rl.question(text, resolve));
+
+const client = await createClient({ auth: './pairing-session' });
+
+// Request code if not registered
+if (!client.authState.creds.registered) {
+    const phoneNumber = await question('Please enter your phone number (e.g. 1234567890):\n');
+    const code = await client.requestPairingCode(phoneNumber);
+    console.log(`Your pairing code is: ${code}`);
+}
+```
+</details>
+
+<details>
+<summary><strong>Using Middleware (Rate Limiting)</strong></summary>
+
+```typescript
+import { createClient, rateLimitMiddleware } from '@atharvh01/wakit';
+
+const client = await createClient({ auth: './session' });
+
+// Limit incoming messages to 10 per minute per JID
+client.useIncoming(rateLimitMiddleware({ maxPerWindow: 10, windowMs: 60_000 }));
+```
+</details>
+
+<details>
+<summary><strong>Writing a Custom Plugin</strong></summary>
+
+```typescript
+import { createClient, definePlugin } from '@atharvh01/wakit';
+
+const helloPlugin = definePlugin({
+    name: 'hello-world',
+    version: '1.0.0',
+    async install(client) {
+        client.on('messages.upsert', async (event) => {
+            console.log(`Received message from ${event.messages[0].key.remoteJid}`);
+        });
+    }
+});
+
+const client = await createClient({ auth: './session' });
+await client.use(helloPlugin);
+```
+</details>
+
+<details>
+<summary><strong>Legacy Compatibility (makeWASocket)</strong></summary>
+If you are migrating from Baileys, the original `makeWASocket` API is still fully exported and backward compatible!
+
+```typescript
+import makeWASocket, { useMultiFileAuthState } from '@atharvh01/wakit';
+
+const { state, saveCreds } = await useMultiFileAuthState('auth');
+const sock = makeWASocket({ auth: state });
+
+sock.ev.on('creds.update', saveCreds);
+```
+</details>
+
+---
+
+## 📂 Project Structure
+
+```
+WAKit/
+ ├── src/
+ │   ├── client/       # Next-gen WAKitClient wrapper
+ │   ├── Middleware/   # Interceptors, rate limiters, logging pipelines
+ │   ├── Plugins/      # Plugin registry and ecosystem logic
+ │   ├── Storage/      # MemoryStore and JsonFileStore adapters
+ │   ├── Socket/       # Low-level Noise protocol and socket lifecycle
+ │   ├── Utils/        # Decoders, Crypto, Circuit Breakers, Event Bus
+ │   └── WAProto/      # Generated Protobuf schemas
+ └── Example/          # Reference implementations
 ```
 
 ---
 
-## 🏗 Core Concepts
+## 🔍 API Overview
 
-### 1. Middleware Pipelines
-Modify or filter messages before they reach your business logic (incoming) or before they are sent to the WhatsApp servers (outgoing).
-
-```typescript
-import { filterJidMiddleware, rateLimitMiddleware } from '@atharvh01/wakit/Middleware/builtins'
-
-// Drop messages from certain JIDs
-client.useIncoming(filterJidMiddleware(jid => jid.includes('broadcast')))
-
-// Apply a sliding-window rate limit (e.g. 60 messages / minute)
-client.useIncoming(rateLimitMiddleware({ maxPerWindow: 60, windowMs: 60000 }))
-```
-
-### 2. Plugin Ecosystem
-Encapsulate complex behavior into reusable plugins.
-
-```typescript
-import { AutoReadPlugin } from '@atharvh01/wakit/Plugins/AutoRead'
-
-// Automatically send read receipts for incoming messages
-client.registerPlugin(new AutoReadPlugin())
-```
-
-### 3. Advanced Event Bus
-The `WAKitEventBus` wraps the standard emitter with ring-buffer history and filtering.
-
-```typescript
-// Replay the last 5 'messages.upsert' events instantly upon registration
-client.events.replay('messages.upsert', (data) => {
-  console.log('Replayed:', data)
-})
-
-// Only trigger listener if a specific condition is met
-client.events.filter('connection.update', 
-  (update) => update.connection === 'open',
-  () => console.log('This will only fire when the connection opens!')
-)
-```
+- `createClient(config)`: The modern entrypoint for WAKit. Returns a `WAKitClient`.
+- `makeWASocket(config)`: The low-level socket constructor (Baileys compatible).
+- `definePlugin(plugin)`: Type-safe plugin constructor.
+- `createPipeline()`: Instantiates a middleware pipeline for message interception.
+- `MemoryStore` / `JsonFileStore`: Implementations of `WAKitStore` for session management.
 
 ---
 
-## 📖 Documentation
+## ⚡ Performance
 
-Detailed documentation and guides are available in the `/docs` directory:
+WAKit introduces robust structural enhancements to maintain performance at scale:
+- **Bracket-pattern resource cleanup:** Memory leaks common in long-running socket connections have been heavily patched.
+- **Native BigInt conversions:** Protobuf long decoding now utilizes native V8 `BigInt` mappings directly in `longToNumber` resulting in faster binary unmarshalling.
+- **CacheStore Integration:** Signal Keys and retry counters are cached using `@cacheable/node-cache` preventing redundant disk/network I/O.
 
-- [Architecture Overview](./docs/architecture.md)
-- [Middleware Guide](./docs/middleware.md)
-- [Plugin Development](./docs/plugins.md)
-- [Storage Systems](./docs/storage.md)
+---
+
+## ❓ FAQ
+
+**Q: Can I use WAKit in the browser?**  
+A: No. WAKit communicates directly via raw TCP/WebSockets and requires a Node.js environment (specifically for crypto and filesystem operations).
+
+**Q: Will Baileys plugins work with WAKit?**  
+A: Because WAKit retains backward compatibility with `makeWASocket`, most logic written for Baileys will drop-in perfectly. However, for future development, we recommend using WAKit's native `definePlugin` API.
+
+**Q: Can this be used for mass messaging or spam?**  
+A: Absolutely not. We do not accept or support usage whose primary purpose is to enable abuse or evade WhatsApp's anti-spam mechanisms.
+
+---
+
+## ⚠️ Known Limitations
+
+- **Evolving APIs:** The next-gen APIs (`WAKitClient`, `Plugins`, `Middleware`) are actively being fleshed out. Expect minor additions and improvements over the next few releases.
+- **E2E Encryption Sync:** Heavy history syncs (fetching years of old messages) can be resource-intensive during initial device linking.
+
+---
+
+## 🗺️ Roadmap
+
+- [x] Complete Next-Gen `WAKitClient` wrapper.
+- [x] Pluggable Storage Adapters (`JsonFileStore`).
+- [ ] First-class Database Adapters (PostgreSQL/Redis) natively included.
+- [ ] Standardized community Plugin Registry.
+- [ ] Improved documentation site built with VitePress.
 
 ---
 
 ## 🤝 Contributing
 
-We welcome contributions from the community! If you're planning to write code, please read our [Contributing Guide](CONTRIBUTING.md) and our [AGENTS.md](./AGENTS.md) if you are an AI coding assistant.
+We welcome contributions! To get started:
 
-1. Fork the repository.
-2. Ensure you are using Corepack (`corepack enable`) and Yarn 4.
-3. Run `yarn build` and `yarn test` to verify your environment.
-4. Open a Pull Request!
+1. **Fork** the repository.
+2. **Branch** off `main` (`git checkout -b feat/my-new-feature`).
+3. Ensure all tests and linting pass (`yarn lint` & `yarn test`).
+4. **Commit** using Conventional Commits.
+5. Submit a **Pull Request**.
 
----
-
-## 👨‍💻 About the Creator
-
-**WAKit** is designed and maintained by **Atharv Hatwar** and the open-source community. 
-
-Atharv is a software engineer passionate about developer tooling, robust systems architecture, and pushing the boundaries of what is possible in the open-source ecosystem.
-
-🌍 **Connect with Atharv:**
-- **GitHub**: [github.com/atharv01h](https://github.com/atharv01h)
-- **NPM**: [npmjs.com/~atharvh01](https://www.npmjs.com/~atharvh01)
-- **LinkedIn**: [linkedin.com/in/atharv-hatwar](https://www.linkedin.com/in/atharv-hatwar/)
+Please read `AGENTS.md` and `CODE_OF_CONDUCT.md` for our strict guidelines on code style, AI authorship, and anti-spam policies.
 
 ---
 
 ## 📄 License
 
-This project is licensed under the MIT License. See the [LICENSE](./LICENSE) file for details. 
+This project is licensed under the **MIT License**.
 
-*Disclaimer: WAKit is not affiliated with, sponsored by, or endorsed by WhatsApp Inc. or Meta Platforms, Inc. Use this software at your own risk and ensure compliance with WhatsApp's Terms of Service.*
+---
+
+## 👤 Creator
+
+**Atharv Hatwar**  
+*Open Source Developer*
