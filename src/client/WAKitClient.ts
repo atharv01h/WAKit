@@ -266,12 +266,12 @@ export class WAKitClient {
 	 */
 	process(handler: (events: Partial<WAKitEventMap>) => void | Promise<void>): () => void {
 		this._processHandlers.push(handler)
-		
+
 		let socketUnsub: (() => void) | undefined
 		if (this._socket) {
 			socketUnsub = this._socket.ev.process(handler)
 		}
-		
+
 		return () => {
 			const idx = this._processHandlers.indexOf(handler)
 			if (idx !== -1) {
@@ -542,12 +542,12 @@ export class WAKitClient {
 
 		this._socket.ev.on('connection.update', async (update: Partial<ConnectionState>) => {
 			const { connection, lastDisconnect } = update
-			
+
 			if (connection === 'open') {
 				this._reconnectAttempts = 0
 				return
 			}
-			
+
 			if (connection !== 'close' || this._destroyed) return
 
 			const statusCode = (lastDisconnect?.error as Boom | undefined)?.output?.statusCode

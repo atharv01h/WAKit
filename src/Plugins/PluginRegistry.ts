@@ -207,7 +207,7 @@ export class PluginRegistry {
 	 */
 	private _createPluginClientProxy(client: WAKitClient, pluginName: string): WAKitClient {
 		const listenerMap = new WeakMap<Function, Function>()
-		
+
 		return new Proxy(client, {
 			get: (target, prop, receiver) => {
 				const value = Reflect.get(target, prop, receiver)
@@ -223,7 +223,7 @@ export class PluginRegistry {
 						return receiver
 					}
 				}
-				
+
 				if (prop === 'off') {
 					return (event: any, listener: Function) => {
 						const wrapped = listenerMap.get(listener)
@@ -251,7 +251,7 @@ export class PluginRegistry {
 						return target.useOutgoing(wrappedMiddleware, id)
 					}
 				}
-				
+
 				if (prop === 'process') {
 					return (handler: Function) => {
 						const wrappedHandler = (...args: any[]) => {

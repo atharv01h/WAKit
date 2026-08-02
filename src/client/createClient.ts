@@ -1,5 +1,4 @@
 import type { UserFacingSocketConfig } from '../Types'
-import { useMultiFileAuthState } from '../Utils/use-multi-file-auth-state'
 import { makeCacheableSignalKeyStore } from '../Utils/auth-utils'
 import { fetchLatestWAKitVersion } from '../Utils/generics'
 import { DEFAULT_CONNECTION_CONFIG } from '../Defaults'
@@ -50,17 +49,30 @@ export async function createClient(config: WAKitClientConfig): Promise<WAKitClie
 	let autoSaveCreds = false
 
 	if (typeof config.auth === 'string') {
-		const { state, saveCreds } = await useMultiFileAuthState(config.auth)
-		resolvedAuth = {
-			creds: state.creds,
-			// Wrap with caching layer for performance (mirrors the example.ts pattern)
-			keys: makeCacheableSignalKeyStore(state.keys, config.logger ?? logger)
-		}
-		// Wire auto-save — we'll attach this listener after client is constructed
-		autoSaveCreds = true
+		const { JsonFileStore } = await import('../Storage/JsonFileStore')
+		const store = new JsonFileStore(config.auth)
+		await store.initialize()
 
-		// Store saveCreds for later wiring
-		;(config as WAKitClientConfig & { _saveCreds?: () => Promise<void> })._saveCreds = saveCreds
+		const { initAuthCreds } = await import('../Utils/auth-utils')
+		const creds = (await store.loadCreds()) ?? initAuthCreds()
+
+		resolvedAuth = {
+			creds,
+			keys: makeCacheableSignalKeyStore(
+				{
+					get: (type, ids) => store.getSignalData(type, ids),
+					set: data => store.setSignalData(data)
+				},
+				config.logger ?? logger
+			)
+		}
+
+		autoSaveCreds = true
+		;(config as WAKitClientConfig & { _saveCreds?: () => Promise<void> })._saveCreds = async () => {
+			if (client?.authState?.creds) {
+				await store.saveCreds(client.authState.creds)
+			}
+		}
 	} else if (
 		config.auth &&
 		typeof (config.auth as import('../Storage/types').WAKitStore).getSignalData === 'function'
@@ -114,7 +126,7 @@ export async function createClient(config: WAKitClientConfig): Promise<WAKitClie
 	// Wire auto-save before first connect so no creds.update is missed
 	if (autoSaveCreds) {
 		const saveCreds = (config as WAKitClientConfig & { _saveCreds?: () => Promise<void> })._saveCreds!
-		client.on('creds.update', (update) => {
+		client.on('creds.update', update => {
 			if (client.authState?.creds && update) {
 				Object.assign(client.authState.creds, update)
 			}
