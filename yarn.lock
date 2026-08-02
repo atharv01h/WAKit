@@ -5,19 +5,20 @@ __metadata:
   version: 8
   cacheKey: 10c0
 
-"@atharvh01/eslint-config@workspace:*, @atharvh01/eslint-config@workspace:eslint-config":
-  version: 0.0.0-use.local
-  resolution: "@atharvh01/eslint-config@workspace:eslint-config"
+"@atharvh01/eslint-config@npm:^1.0.0":
+  version: 1.0.0
+  resolution: "@atharvh01/eslint-config@npm:1.0.0"
   peerDependencies:
     eslint: ^9
-  languageName: unknown
-  linkType: soft
+  checksum: 10c0/b0a6b18ea0d3296e5dfc377592b35a34b8d49e80b5cbbb3b37f6941db58a07bb32613c01022ce60f8f125beecd7943c405a8a8cf4ecb1b26c0725561db176b6d
+  languageName: node
+  linkType: hard
 
 "@atharvh01/wakit@workspace:.":
   version: 0.0.0-use.local
   resolution: "@atharvh01/wakit@workspace:."
   dependencies:
-    "@atharvh01/eslint-config": "workspace:*"
+    "@atharvh01/eslint-config": "npm:^1.0.0"
     "@cacheable/node-cache": "npm:^1.4.0"
     "@eslint/eslintrc": "npm:^3.3.1"
     "@eslint/js": "npm:^9.31.0"
