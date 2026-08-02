@@ -297,7 +297,7 @@ A: Absolutely not. We do not accept or support usage whose primary purpose is to
 - [x] Built-in Job Scheduler.
 - [x] Pluggable Storage Adapters (`JsonFileStore`).
 - [ ] First-class Database Adapters (PostgreSQL/Redis) natively included.
-- [ ] Improved documentation site built with VitePress.
+
 
 ---
 
