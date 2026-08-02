@@ -93,22 +93,24 @@ export class JsonFileStore implements WAKitStore {
 		await this.initialize()
 		const result: { [id: string]: SignalDataTypeMap[T] } = {}
 
-		if (!this._keysData![type]) {
-			this._keysData![type] = {}
+		let typeData = this._keysData![type]
+		if (!typeData) {
+			typeData = {}
+			this._keysData![type] = typeData
 		}
 
 		let needsFlush = false
 
 		await Promise.all(
 			ids.map(async id => {
-				let value = this._keysData![type][id]
+				let value = typeData[id]
 				if (value === undefined) {
 					// Fallback to old individual file format for backward compatibility
 					const filename = this._signalFilename(type, id)
 					const raw = await this._readJson<any>(filename)
 					if (raw !== null) {
 						value = raw
-						this._keysData![type][id] = value // migrate to keys.json
+						typeData[id] = value // migrate to keys.json
 						needsFlush = true
 					}
 				}
