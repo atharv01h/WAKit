@@ -76,9 +76,7 @@ export class PluginRegistry {
 
 	/** Returns a list of all installed plugin names in installation order */
 	installedNames(): string[] {
-		return [...this._registry.entries()]
-			.filter(([, e]) => e.state === 'installed')
-			.map(([name]) => name)
+		return [...this._registry.entries()].filter(([, e]) => e.state === 'installed').map(([name]) => name)
 	}
 
 	/** Returns diagnostic information about all registered plugins */
@@ -111,18 +109,12 @@ export class PluginRegistry {
 	 * Topologically install all declared dependencies.
 	 * Uses DFS with a visiting set for cycle detection.
 	 */
-	private async _resolveDependencies(
-		plugin: WAKitPlugin,
-		client: WAKitClient,
-		visiting: Set<string>
-	): Promise<void> {
+	private async _resolveDependencies(plugin: WAKitPlugin, client: WAKitClient, visiting: Set<string>): Promise<void> {
 		if (!plugin.requires || plugin.requires.length === 0) return
 
 		for (const depName of plugin.requires) {
 			if (visiting.has(depName)) {
-				throw new Error(
-					`WAKit plugin "${plugin.name}": circular dependency detected involving "${depName}"`
-				)
+				throw new Error(`WAKit plugin "${plugin.name}": circular dependency detected involving "${depName}"`)
 			}
 
 			if (this.isInstalled(depName)) {

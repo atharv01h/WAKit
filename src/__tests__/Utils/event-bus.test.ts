@@ -9,12 +9,9 @@ function makeBaseEmitter(): WAKitEventEmitter {
 		on: ee.on.bind(ee),
 		off: ee.off.bind(ee),
 		removeAllListeners: ee.removeAllListeners.bind(ee),
-		emit: (event: keyof WAKitEventMap, data: WAKitEventMap[keyof WAKitEventMap]) =>
-			ee.emit(event as string, data)
+		emit: (event: keyof WAKitEventMap, data: WAKitEventMap[keyof WAKitEventMap]) => ee.emit(event, data)
 	}
 }
-
-const SAMPLE_MSG = { key: { id: 'msg-1', remoteJid: 'abc@s.whatsapp.net', fromMe: false } }
 
 describe('wrapEventBus', () => {
 	it('proxies on/off/emit to the underlying emitter', () => {
@@ -61,18 +58,26 @@ describe('wrapEventBus', () => {
 		bus.emit('connection.update', { connection: 'open' })
 
 		const replayed: string[] = []
-		bus.replay('connection.update', ({ connection }) => {
-			if (connection) replayed.push(connection)
-		}, before)
+		bus.replay(
+			'connection.update',
+			({ connection }) => {
+				if (connection) replayed.push(connection)
+			},
+			before
+		)
 
 		expect(replayed).toEqual(['open'])
 
 		// With a cutoff in the future — nothing should be replayed
 		const future = new Date(Date.now() + 60_000)
 		const replayedFuture: string[] = []
-		bus.replay('connection.update', ({ connection }) => {
-			if (connection) replayedFuture.push(connection as string)
-		}, future)
+		bus.replay(
+			'connection.update',
+			({ connection }) => {
+				if (connection) replayedFuture.push(connection)
+			},
+			future
+		)
 		expect(replayedFuture).toHaveLength(0)
 	})
 

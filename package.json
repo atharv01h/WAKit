@@ -51,9 +51,11 @@
     "pino": "^9.6",
     "protobufjs": "^7.5.6",
     "whatsapp-rust-bridge": "0.5.4",
-    "ws": "^8.13.0"
+    "ws": "^8.13.0",
+    "yarn": "^1.22.22"
   },
   "devDependencies": {
+    "@atharvh01/eslint-config": "^1.0.0",
     "@eslint/eslintrc": "^3.3.1",
     "@eslint/js": "^9.31.0",
     "@types/jest": "^30.0.0",
@@ -61,7 +63,6 @@
     "@types/ws": "^8.0.0",
     "@typescript-eslint/eslint-plugin": "^8",
     "@typescript-eslint/parser": "^8",
-    "@wakit/eslint-config": "^1.0.0",
     "conventional-changelog": "^7.1.1",
     "conventional-changelog-angular": "^8.0.0",
     "esbuild-register": "^3.6.0",

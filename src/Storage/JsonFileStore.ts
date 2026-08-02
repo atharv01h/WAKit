@@ -40,9 +40,7 @@ export class JsonFileStore implements WAKitStore {
 		const info = await stat(this._folder).catch(() => null)
 		if (info) {
 			if (!info.isDirectory()) {
-				throw new Error(
-					`JsonFileStore: path "${this._folder}" exists but is not a directory`
-				)
+				throw new Error(`JsonFileStore: path "${this._folder}" exists but is not a directory`)
 			}
 		} else {
 			await mkdir(this._folder, { recursive: true })
@@ -125,9 +123,7 @@ export class JsonFileStore implements WAKitStore {
 		await this.initialize()
 		const index = await this._readJson<string[]>('chats-index.json')
 		if (!index) return []
-		const chats = await Promise.all(
-			index.map(jid => this._readJson<Chat>(`chat-${this._sanitize(jid)}.json`))
-		)
+		const chats = await Promise.all(index.map(jid => this._readJson<Chat>(`chat-${this._sanitize(jid)}.json`)))
 		return chats.filter((c): c is Chat => c !== null)
 	}
 

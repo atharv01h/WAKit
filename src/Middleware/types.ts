@@ -1,4 +1,3 @@
-import type { proto } from '../../WAProto/index.js'
 import type { WAMessage, AnyMessageContent } from '../Types'
 import type { MiscMessageGenerationOptions } from '../Types/Message'
 

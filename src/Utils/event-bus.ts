@@ -1,4 +1,4 @@
-import type { WAKitEvent, WAKitEventEmitter, WAKitEventMap } from '../Types'
+import type { WAKitEventEmitter, WAKitEventMap } from '../Types'
 
 // ─── Ring Buffer ──────────────────────────────────────────────────────────────
 
@@ -105,11 +105,7 @@ export interface WAKitEventBus extends WAKitEventEmitter {
 	 * bus.replay('messages.upsert', ({ messages }) => console.log(messages))
 	 * ```
 	 */
-	replay<E extends keyof WAKitEventMap>(
-		event: E,
-		listener: (data: WAKitEventMap[E]) => void,
-		since?: Date
-	): void
+	replay<E extends keyof WAKitEventMap>(event: E, listener: (data: WAKitEventMap[E]) => void, since?: Date): void
 
 	/**
 	 * Start capturing all events to an in-memory recording.
@@ -142,10 +138,7 @@ export interface WAKitEventBus extends WAKitEventEmitter {
  * bus.replay('messages.upsert', handler)
  * ```
  */
-export function wrapEventBus(
-	baseEmitter: WAKitEventEmitter,
-	opts: WAKitEventBusOptions = {}
-): WAKitEventBus {
+export function wrapEventBus(baseEmitter: WAKitEventEmitter, opts: WAKitEventBusOptions = {}): WAKitEventBus {
 	const historyCapacity = opts.historyCapacity ?? 100
 
 	// Per-event ring buffers (lazily created)
@@ -165,17 +158,14 @@ export function wrapEventBus(
 	// Intercept emit to record history
 	const originalEmit = baseEmitter.emit.bind(baseEmitter)
 
-	const enhancedEmit = <E extends keyof WAKitEventMap>(
-		event: E,
-		data: WAKitEventMap[E]
-	): boolean => {
+	const enhancedEmit = <E extends keyof WAKitEventMap>(event: E, data: WAKitEventMap[E]): boolean => {
 		// Record to ring buffer
 		const entry: EventHistoryEntry<E> = { event, data, timestamp: new Date() }
-		getRing(event).push(entry as unknown as EventHistoryEntry<E>)
+		getRing(event).push(entry)
 
 		// Record to active recording if any
 		if (recording) {
-			recording.push(entry as unknown as EventHistoryEntry)
+			recording.push(entry)
 		}
 
 		return originalEmit(event, data)
@@ -203,16 +193,12 @@ export function wrapEventBus(
 			return () => baseEmitter.off(event, wrapped)
 		},
 
-		replay<E extends keyof WAKitEventMap>(
-			event: E,
-			listener: (data: WAKitEventMap[E]) => void,
-			since?: Date
-		): void {
+		replay<E extends keyof WAKitEventMap>(event: E, listener: (data: WAKitEventMap[E]) => void, since?: Date): void {
 			const ring = getRing(event)
 			const entries = ring.toArray()
 			for (const entry of entries) {
 				if (!since || entry.timestamp > since) {
-					listener(entry.data as WAKitEventMap[E])
+					listener(entry.data)
 				}
 			}
 		},
@@ -227,7 +213,7 @@ export function wrapEventBus(
 		},
 
 		history<E extends keyof WAKitEventMap>(event: E): EventHistoryEntry<E>[] {
-			return getRing(event).toArray() as EventHistoryEntry<E>[]
+			return getRing(event).toArray()
 		}
 	}
 

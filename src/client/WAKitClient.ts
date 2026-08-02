@@ -1,5 +1,5 @@
 import { Boom } from '@hapi/boom'
-import type { WAKitEventEmitter, WAKitEventMap, UserFacingSocketConfig, ConnectionState } from '../Types'
+import type { WAKitEventMap, UserFacingSocketConfig, ConnectionState } from '../Types'
 import { DisconnectReason } from '../Types'
 import type { ILogger } from '../Utils/logger'
 import type { WAKitPlugin } from '../Plugins/types'
@@ -244,9 +244,13 @@ export class WAKitClient {
 	// ─── Proxied socket methods (ergonomic shortcuts) ─────────────────────────
 
 	/** Send a message. Proxied from the underlying socket, but runs through the outgoing middleware pipeline first. */
-	async sendMessage(jid: string, content: import('../Types').AnyMessageContent, options?: import('../Types').MiscMessageGenerationOptions) {
+	async sendMessage(
+		jid: string,
+		content: import('../Types').AnyMessageContent,
+		options?: import('../Types').MiscMessageGenerationOptions
+	) {
 		const ctx: OutgoingMessageContext = { jid, content, options, abort: false, meta: {} }
-		
+
 		if (this._outgoingPipeline.hasMiddleware) {
 			await this._outgoingPipeline.execute(ctx)
 			if (ctx.abort) return undefined
@@ -287,13 +291,13 @@ export class WAKitClient {
 		for (const [event, listeners] of this._eventListeners) {
 			if (event === 'messages.upsert') {
 				// Special handling for messages.upsert to run the incoming pipeline
-				this._socket.ev.on('messages.upsert', async (data) => {
+				this._socket.ev.on('messages.upsert', async data => {
 					if (!this._incomingPipeline.hasMiddleware) {
-						listeners.forEach(l => l(data as any))
+						listeners.forEach(l => l(data))
 						return
 					}
 
-					const upsert = data as WAKitEventMap['messages.upsert']
+					const upsert = data
 					const processedMessages = []
 
 					for (const msg of upsert.messages) {
@@ -312,12 +316,12 @@ export class WAKitClient {
 
 					if (processedMessages.length > 0) {
 						const newData = { ...upsert, messages: processedMessages }
-						listeners.forEach(l => l(newData as any))
+						listeners.forEach(l => l(newData))
 					}
 				})
 			} else {
 				for (const listener of listeners) {
-					this._socket.ev.on(event as keyof WAKitEventMap, listener as (arg: WAKitEventMap[keyof WAKitEventMap]) => void)
+					this._socket.ev.on(event, listener)
 				}
 			}
 		}

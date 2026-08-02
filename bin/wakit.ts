@@ -111,7 +111,8 @@ async function cmdDoctor() {
 		const hasWAKit =
 			pkg.dependencies?.wakit ||
 			pkg.devDependencies?.wakit ||
-			pkg.dependencies?.['@wakit/wakit']
+			pkg.dependencies?.['@atharvh01/wakit'] ||
+			pkg.devDependencies?.['@atharvh01/wakit']
 		if (hasWAKit) {
 			ok('wakit found in package.json')
 		} else {

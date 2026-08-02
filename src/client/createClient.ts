@@ -61,21 +61,27 @@ export async function createClient(config: WAKitClientConfig): Promise<WAKitClie
 
 		// Store saveCreds for later wiring
 		;(config as WAKitClientConfig & { _saveCreds?: () => Promise<void> })._saveCreds = saveCreds
-	} else if (config.auth && typeof (config.auth as import('../Storage/types').WAKitStore).getSignalData === 'function') {
+	} else if (
+		config.auth &&
+		typeof (config.auth as import('../Storage/types').WAKitStore).getSignalData === 'function'
+	) {
 		const store = config.auth as import('../Storage/types').WAKitStore
 		if (store.initialize) await store.initialize()
-		
+
 		const { initAuthCreds } = await import('../Utils/auth-utils')
-		const creds = await store.loadCreds() ?? initAuthCreds()
-		
+		const creds = (await store.loadCreds()) ?? initAuthCreds()
+
 		resolvedAuth = {
 			creds,
-			keys: makeCacheableSignalKeyStore({
-				get: (type, ids) => store.getSignalData(type, ids),
-				set: (data) => store.setSignalData(data)
-			}, config.logger ?? logger)
+			keys: makeCacheableSignalKeyStore(
+				{
+					get: (type, ids) => store.getSignalData(type, ids),
+					set: data => store.setSignalData(data)
+				},
+				config.logger ?? logger
+			)
 		}
-		
+
 		autoSaveCreds = true
 		;(config as WAKitClientConfig & { _saveCreds?: () => Promise<void> })._saveCreds = async () => {
 			if (client?.authState?.creds) {

@@ -124,9 +124,7 @@ export function rateLimitMiddleware(opts: RateLimitOptions = {}): Middleware<Inc
  * client.useIncoming(filterJidMiddleware(jid => isJidBroadcast(jid)))
  * ```
  */
-export function filterJidMiddleware(
-	predicate: (jid: string) => boolean
-): Middleware<IncomingMessageContext> {
+export function filterJidMiddleware(predicate: (jid: string) => boolean): Middleware<IncomingMessageContext> {
 	return async (ctx, next) => {
 		if (predicate(ctx.remoteJid)) {
 			ctx.drop = true
@@ -154,9 +152,7 @@ export interface SimpleMetricsCollector {
  * client.useIncoming(metricsMiddleware(collector))
  * ```
  */
-export function incomingMetricsMiddleware(
-	collector: SimpleMetricsCollector
-): Middleware<IncomingMessageContext> {
+export function incomingMetricsMiddleware(collector: SimpleMetricsCollector): Middleware<IncomingMessageContext> {
 	return async (ctx, next) => {
 		const start = Date.now()
 		await next()
@@ -169,9 +165,7 @@ export function incomingMetricsMiddleware(
 /**
  * Collects basic counts and latency metrics for outgoing messages.
  */
-export function outgoingMetricsMiddleware(
-	collector: SimpleMetricsCollector
-): Middleware<OutgoingMessageContext> {
+export function outgoingMetricsMiddleware(collector: SimpleMetricsCollector): Middleware<OutgoingMessageContext> {
 	return async (ctx, next) => {
 		const start = Date.now()
 		await next()

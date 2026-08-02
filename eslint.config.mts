@@ -4,7 +4,9 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import js from "@eslint/js";
 import { FlatCompat } from "@eslint/eslintrc";
-import base from "@wakit/eslint-config";
+import typescriptEslint from "@typescript-eslint/eslint-plugin";
+import typescriptParser from "@typescript-eslint/parser";
+import base from "@atharvh01/eslint-config";
 
 
 const __filename = fileURLToPath(import.meta.url);
@@ -36,10 +38,12 @@ export default defineConfig([globalIgnores([
 
     plugins: {
         prettier,
+        "@typescript-eslint": typescriptEslint
     },
 
     languageOptions: {
-        ecmaVersion: 5,
+        parser: typescriptParser,
+        ecmaVersion: 2020,
         sourceType: "module",
 
         parserOptions: {
@@ -54,6 +58,15 @@ export default defineConfig([globalIgnores([
         "@typescript-eslint/no-explicit-any": ["warn", {
             ignoreRestArgs: true,
         }],
+
+        "@typescript-eslint/no-unused-vars": [
+            "warn",
+            {
+                "argsIgnorePattern": "^_",
+                "varsIgnorePattern": "^_",
+                "caughtErrorsIgnorePattern": "^_"
+            }
+        ],
 
         "@typescript-eslint/no-inferrable-types": ["warn"],
         "@typescript-eslint/no-redundant-type-constituents": ["warn"],

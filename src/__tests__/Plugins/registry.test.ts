@@ -9,8 +9,8 @@ function makePlugin(overrides: Partial<WAKitPlugin> = {}): WAKitPlugin {
 	return {
 		name: 'test-plugin',
 		version: '1.0.0',
-		install: jest.fn().mockResolvedValue(undefined),
-		uninstall: jest.fn().mockResolvedValue(undefined),
+		install: jest.fn<any>().mockResolvedValue(undefined),
+		uninstall: jest.fn<any>().mockResolvedValue(undefined),
 		...overrides
 	}
 }
@@ -81,9 +81,7 @@ describe('PluginRegistry', () => {
 			name: 'dependent',
 			requires: ['missing-dep']
 		})
-		await expect(registry.install(plugin, mockClient)).rejects.toThrow(
-			'required plugin "missing-dep" is not installed'
-		)
+		await expect(registry.install(plugin, mockClient)).rejects.toThrow('required plugin "missing-dep" is not installed')
 	})
 
 	it('succeeds when all declared dependencies are already installed', async () => {
@@ -96,7 +94,7 @@ describe('PluginRegistry', () => {
 
 	it('marks plugin as failed when install() throws', async () => {
 		const plugin = makePlugin({
-			install: jest.fn().mockRejectedValue(new Error('install-fail'))
+			install: jest.fn<any>().mockRejectedValue(new Error('install-fail'))
 		})
 
 		await expect(registry.install(plugin, mockClient)).rejects.toThrow('install-fail')

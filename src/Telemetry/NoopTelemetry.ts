@@ -1,4 +1,5 @@
 import type { WAKitTelemetry } from './types'
+/* eslint-disable @typescript-eslint/no-unused-vars */
 
 /**
  * Zero-overhead no-op telemetry implementation.
@@ -9,15 +10,13 @@ import type { WAKitTelemetry } from './types'
  * To switch to a real telemetry provider, set `telemetry` in createClient() options.
  */
 export class NoopTelemetry implements WAKitTelemetry {
-	// eslint-disable-next-line @typescript-eslint/no-empty-function
 	count(_metric: string, _value?: number, _labels?: Record<string, string>): void {}
-	// eslint-disable-next-line @typescript-eslint/no-empty-function
+
 	record(_metric: string, _value: number, _labels?: Record<string, string>): void {}
-	// eslint-disable-next-line @typescript-eslint/no-empty-function
+
 	gauge(_metric: string, _value: number, _labels?: Record<string, string>): void {}
 
 	span(_name: string, _attributes?: Record<string, string>): (status?: 'ok' | 'error') => void {
-		// eslint-disable-next-line @typescript-eslint/no-empty-function
 		return () => {}
 	}
 }

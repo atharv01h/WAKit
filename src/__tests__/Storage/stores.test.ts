@@ -1,6 +1,5 @@
 import { MemoryStore } from '../../Storage/MemoryStore'
 import { initAuthCreds } from '../../Utils/auth-utils'
-import type { AuthenticationCreds } from '../../Types'
 
 describe('MemoryStore', () => {
 	let store: MemoryStore
@@ -76,14 +75,14 @@ describe('MemoryStore', () => {
 	})
 
 	it('stores and retrieves chats', async () => {
-		await store.saveChat({ id: 'abc@s.whatsapp.net' } as import('../../Types').Chat)
+		await store.saveChat({ id: 'abc@s.whatsapp.net' })
 		const chats = await store.loadChats()
 		expect(chats).toHaveLength(1)
 		expect(chats[0]!.id).toBe('abc@s.whatsapp.net')
 	})
 
 	it('deletes a chat', async () => {
-		await store.saveChat({ id: 'abc@s.whatsapp.net' } as import('../../Types').Chat)
+		await store.saveChat({ id: 'abc@s.whatsapp.net' })
 		await store.deleteChat('abc@s.whatsapp.net')
 		const chats = await store.loadChats()
 		expect(chats).toHaveLength(0)

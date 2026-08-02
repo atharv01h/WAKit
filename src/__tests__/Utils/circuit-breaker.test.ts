@@ -1,6 +1,5 @@
 import { jest } from '@jest/globals'
-import { CircuitBreaker, CircuitBreakerError } from '../../Utils/circuit-breaker'
-import { Boom } from '@hapi/boom'
+import { CircuitBreaker } from '../../Utils/circuit-breaker'
 
 describe('CircuitBreaker', () => {
 	let cb: CircuitBreaker

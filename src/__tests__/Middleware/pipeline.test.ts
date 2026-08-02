@@ -1,10 +1,9 @@
 import { createPipeline } from '../../Middleware/createPipeline'
 import type { IncomingMessageContext } from '../../Middleware/types'
-import type { WAMessage } from '../../Types'
 
 function makeCtx(jid = 'test@s.whatsapp.net'): IncomingMessageContext {
 	return {
-		message: { key: { id: 'test-id', remoteJid: jid, fromMe: false } } as WAMessage,
+		message: { key: { id: 'test-id', remoteJid: jid, fromMe: false } },
 		remoteJid: jid,
 		drop: false,
 		meta: {}
@@ -51,7 +50,7 @@ describe('createPipeline', () => {
 		const pipeline = createPipeline<IncomingMessageContext>()
 		const called: number[] = []
 
-		pipeline.use(async (ctx, _next) => {
+		pipeline.use(async ctx => {
 			called.push(1)
 			ctx.drop = true
 			// intentionally not calling next
