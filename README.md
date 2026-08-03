@@ -54,6 +54,17 @@ WAKit introduces:
 
 ---
 
+## 🎨 WAKit Studio
+
+**WAKit Studio** is a beautiful, stateless, node-based visual builder for creating WAKit bots! 
+
+Say goodbye to manually writing complex conversational routing logic. With WAKit Studio, you can drag and drop nodes, connect triggers to actions, simulate conversations live, and instantly **export a fully functional Node.js bot project** in a single click.
+
+- **Live Demo**: [wakitstudio.netlify.app](https://wakitstudio.netlify.app/)
+- **Source Code**: [github.com/atharv01h/WAKit-Studio](https://github.com/atharv01h/WAKit-Studio)
+
+---
+
 ## ✨ What's New in WAKit
 
 WAKit introduces several next-generation architectural improvements over standard clients:
