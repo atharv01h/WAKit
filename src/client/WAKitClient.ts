@@ -61,7 +61,7 @@ export interface WAKitClientConfig extends Omit<Partial<UserFacingSocketConfig>,
  * await client.sendMessage(jid, { text: 'hello' })
  *
  * // REST API
- * await client.api.enable({ port: 3000 })
+ * await client.api.start()
  *
  * // Scheduler
  * client.scheduler.daily('09:00', async () => {

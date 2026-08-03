@@ -169,3 +169,84 @@ describe('WAKitRecorder — replay', () => {
 		await expect(recorder.load('./nonexistent-file-xyz.json')).rejects.toThrow('not found')
 	})
 })
+
+describe('WAKitRecorder — replayStream', () => {
+	it('yields all events in index order', async () => {
+		const { recorder, fire } = makeRecorderWithEmitter()
+		recorder.start()
+		fire('connection.update', { connection: 'open' })
+		fire('creds.update', {})
+		fire('connection.update', { connection: 'close' })
+		const session = recorder.stop()
+
+		const replayer = new WAKitRecorder()
+		const emitted: string[] = []
+		replayer._wire(
+			() => {},
+			() => {},
+			event => emitted.push(event)
+		)
+
+		const yielded: Array<{ event: string; index: number }> = []
+		for await (const { entry, index } of replayer.replayStream(session)) {
+			yielded.push({ event: entry.event, index })
+		}
+
+		expect(yielded).toHaveLength(3)
+		expect(yielded[0]).toEqual({ event: 'connection.update', index: 0 })
+		expect(yielded[1]).toEqual({ event: 'creds.update', index: 1 })
+		expect(yielded[2]).toEqual({ event: 'connection.update', index: 2 })
+		// Events are also emitted into the WAKit system
+		expect(emitted).toHaveLength(3)
+	})
+
+	it('filter option restricts yielded events', async () => {
+		const { recorder, fire } = makeRecorderWithEmitter()
+		recorder.start()
+		fire('connection.update', {})
+		fire('creds.update', {})
+		fire('connection.update', {})
+		const session = recorder.stop()
+
+		const replayer = new WAKitRecorder()
+		replayer._wire(
+			() => {},
+			() => {},
+			() => {}
+		)
+
+		const yielded: string[] = []
+		for await (const { entry } of replayer.replayStream(session, { filter: ['connection.update'] })) {
+			yielded.push(entry.event)
+		}
+
+		expect(yielded).toEqual(['connection.update', 'connection.update'])
+	})
+
+	it('fromIndex and toIndex slice the stream', async () => {
+		const { recorder, fire } = makeRecorderWithEmitter()
+		recorder.start()
+		for (let i = 0; i < 5; i++) fire('connection.update', { connection: 'open' })
+		const session = recorder.stop()
+
+		const replayer = new WAKitRecorder()
+		replayer._wire(
+			() => {},
+			() => {},
+			() => {}
+		)
+
+		const indices: number[] = []
+		for await (const { index } of replayer.replayStream(session, { fromIndex: 1, toIndex: 3 })) {
+			indices.push(index)
+		}
+
+		expect(indices).toEqual([1, 2, 3])
+	})
+
+	it('throws if not wired to a client', async () => {
+		const recorder = new WAKitRecorder()
+		const stream = recorder.replayStream({ version: 1, WAKitVersion: '1.0.0', recordedAt: '', events: [] })
+		await expect(stream.next()).rejects.toThrow('not wired')
+	})
+})

@@ -174,7 +174,7 @@ export class WAKitRestServer {
 			res.json(this._generateOpenApiSpec())
 		})
 
-		// Swagger UI (served inline — no CDN dependency)
+		// Swagger UI (loads swagger-ui-dist@5 from unpkg.com CDN)
 		if (this._config.swagger) {
 			app.get('/docs', (_req, res) => {
 				res.setHeader('Content-Type', 'text/html')

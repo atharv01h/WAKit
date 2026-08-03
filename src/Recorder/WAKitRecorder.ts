@@ -29,12 +29,12 @@ const WAKIT_VERSION = '1.0.4'
  * })
  * ```
  *
- * @example Step-by-step debugging
+ * @example Step-by-step debugging (async iterator — caller controls the pace)
  * ```ts
- * const player = client.recorder.replayStream('./debug-session.json', { stepByStep: true })
- * for await (const { entry, index, next } of player) {
- *   console.log(`[${index}]`, entry.event)
- *   await next() // advance to next event
+ * const stream = client.recorder.replayStream('./debug-session.json')
+ * for await (const { entry, index } of stream) {
+ *   console.log(`[${index}]`, entry.event, entry.data)
+ *   // returning from the loop body automatically advances to the next event
  * }
  * ```
  */
@@ -228,6 +228,61 @@ export class WAKitRecorder {
 
 			onEvent?.(entry, fromIndex + i)
 			this._emitFn(entry.event, entry.data)
+		}
+	}
+
+	/**
+	 * Replay events from a file or session as an async generator.
+	 * Each iteration yields the next event and emits it into the WAKit event system,
+	 * giving the caller full control over pacing via the `for await` loop.
+	 *
+	 * Unlike `replay()`, this method does not apply time-based delays — events are
+	 * emitted one per iteration. Use this for step-by-step debugging or when you
+	 * need to inspect each event before it reaches your handlers.
+	 *
+	 * @param source File path or pre-loaded session
+	 * @param opts Subset of ReplayOptions: `filter`, `fromIndex`, `toIndex`
+	 *
+	 * @example
+	 * ```ts
+	 * for await (const { entry, index } of client.recorder.replayStream('./session.json')) {
+	 *   console.log(`[${index}]`, entry.event)
+	 *   // Only messages.upsert events reach your handlers — filtered inline:
+	 * }
+	 *
+	 * // With filter
+	 * const stream = client.recorder.replayStream('./session.json', {
+	 *   filter: ['messages.upsert', 'connection.update']
+	 * })
+	 * for await (const { entry, index } of stream) {
+	 *   console.log(`Event ${index}:`, entry.event)
+	 * }
+	 * ```
+	 */
+	async *replayStream(
+		source: string | RecordedSession,
+		opts: Pick<ReplayOptions, 'filter' | 'fromIndex' | 'toIndex'> = {}
+	): AsyncGenerator<{ entry: RecordedEntry; index: number }> {
+		if (!this._emitFn) {
+			throw new Boom('Recorder is not wired to a client. Use client.recorder instead.', {
+				statusCode: 503
+			})
+		}
+
+		const session = typeof source === 'string' ? await this.load(source) : source
+		const { filter, fromIndex = 0, toIndex } = opts
+
+		const events = session.events.slice(fromIndex, toIndex !== undefined ? toIndex + 1 : undefined)
+		const filtered = filter ? events.filter(e => filter.includes(e.event)) : events
+
+		for (const [i, entry] of filtered.entries()) {
+			const absoluteIndex = fromIndex + i
+			// Emit into the live event system so all registered handlers fire
+			this._emitFn(entry.event, entry.data)
+			// Yield control to the caller — they decide when to advance
+			yield { entry, index: absoluteIndex }
+			// Micro-yield so event listeners can process before the next iteration
+			await new Promise(r => setTimeout(r, 0))
 		}
 	}
 }
